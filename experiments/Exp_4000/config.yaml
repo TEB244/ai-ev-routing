@@ -31,6 +31,7 @@ environment_settings:
   num_of_cars: 100
   num_of_chargers: 1
   radius: 20
+  saving_data_deepness: episode_level
   season: spring
   seed: 1234
   starting_charge: 6000
@@ -39,7 +40,6 @@ environment_settings:
   - 9840
   - 8460
   - 9360
-  saving_data_deepness: timestep_level # level per: aggregation, episode, timestep
 eval_config:
   continue_training: false
   display_training_times: false

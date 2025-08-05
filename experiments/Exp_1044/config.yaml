@@ -50,7 +50,9 @@ eval_config:
   save_aggregate_rewards: false
   save_data: true
   save_offline_data: true
-  save_path_metrics: ~/mnt/storage_1/merl/metrics/Exp
+  save_path_metrics:
+    DRAC: ../../../storage_1/metrics/Exp
+    Local: /mnt/storage_1/merl/metrics//Exp
   verbose: true
 federated_learning_settings:
   aggregation_count: 2

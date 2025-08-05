@@ -50,7 +50,9 @@ eval_config:
   save_aggregate_rewards: false
   save_data: true
   save_offline_data: true
-  save_path_metrics: ../../../storage_1/metrics/Exp
+  save_path_metrics:
+    DRAC: ../../../storage_1/metrics/Exp
+    Local: /mnt/storage_1/merl/metrics//Exp
   verbose: true
 federated_learning_settings:
   aggregation_count: 50
@@ -96,9 +98,9 @@ odt_hyperparameters:
   num_online_rollouts: 1
   num_updates_per_online_iter: 25
   num_updates_per_pretrain_iter: 500
+  offline_dataset_path: /home/epigou/rl-for-vrp-csp/metrics/Exp_3000/
   online_rtg: -60
   ordering: 0
   replay_size: 500
   warmup_steps: 10000
   weight_decay: 0.0005
-  offline_dataset_path: "/home/epigou/rl-for-vrp-csp/metrics/Exp_3000/"

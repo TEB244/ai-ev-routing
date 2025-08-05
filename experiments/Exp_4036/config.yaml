@@ -40,7 +40,6 @@ environment_settings:
   - 9840
   - 8460
   - 9360
-  saving_data_deepness: timestep_level # level per: aggregation, episode, timestep
 eval_config:
   continue_training: false
   display_training_times: false
@@ -51,7 +50,9 @@ eval_config:
   save_aggregate_rewards: false
   save_data: true
   save_offline_data: false
-  save_path_metrics: ../../../storage_1/metrics/Exp
+  save_path_metrics:
+    DRAC: ../../../storage_1/metrics/Exp
+    Local: /mnt/storage_1/merl/metrics//Exp
   verbose: true
 federated_learning_settings:
   aggregation_count: 5
