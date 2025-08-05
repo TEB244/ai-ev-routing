@@ -6,7 +6,7 @@ import copy
 from datetime import datetime
 import numpy as np
 import torch
-from codecarbon import EmissionsTracker
+# from codecarbon import EmissionsTracker
 import shutil
 import pandas as pd
 import cProfile
@@ -99,7 +99,7 @@ def main_loop(args):
     federated_c = c['federated_learning_settings']
 
     # Data directory where metrics are saved
-    data_dir = args.data_dir if args.data_dir else f"{c['eval_config']['save_path_metrics']}"
+    data_dir = args.data_dir if args.data_dir else f"{c['eval_config']['save_path_metrics'][args.server]}"
     
     # Whether to continue the training
     load_existing_model = eval_c['continue_training']
@@ -164,15 +164,6 @@ def main_loop(args):
     if (run_mode == "Evaluating") or (load_existing_model):
         global_weights = torch.load(f'saved_networks/Exp_{experiment_number}/global_weights.pth')
 
-    # # Start log writer process
-    # log_path = f'{logs_dir}/{date}-{run_mode}_logs.txt'
-    # log_queue = mp.Queue()
-    # log_proc = mp.Process(target=log_writer, args=(log_queue, log_path, verbose))
-    # log_proc.start()
-
-    # print_l, print_et = print_log(log_queue)
-    # print_l(f"Saving metrics to base path: {metrics_with_sub_dir}", )
-
     # Start writer proccess
     metrics_path = f"{metrics_base_path}/{'eval' if args.eval else 'train'}"
     log_path = f'{logs_dir}/{date}-{run_mode}_logs.txt'
@@ -207,7 +198,7 @@ def main_loop(args):
     start_time = time.time()
     for area_idx in range(n_zones):
         environment = EnvironmentClass(config_fname, seed, chargers_seeds[area_idx],\
-                                       area_idx, device=devices[area_idx], dtype=torch.float32)
+                                       area_idx, args.server, device=devices[area_idx], dtype=torch.float32)
 
         environment_list.append(environment)
         ev_info.append(environment.get_ev_info())
@@ -257,15 +248,15 @@ def main_loop(args):
         # Loop through aggregation steps
         for aggregate_step in range(federated_c['aggregation_count']):
             try:
-                # Start tracking emissions
-                tracker = EmissionsTracker(
-                    output_dir=emission_output_dir,
-                    save_to_file=f"emissions.csv",  # Temporary file
-                    tracking_mode='process',
-                    allow_multiple_runs=True,
-                    log_level='error'
-                )
-                tracker.start()
+                # # Start tracking emissions
+                # tracker = EmissionsTracker(
+                #     output_dir=emission_output_dir,
+                #     save_to_file=f"emissions.csv",  # Temporary file
+                #     tracking_mode='process',
+                #     allow_multiple_runs=True,
+                #     log_level='error'
+                # )
+                # tracker.start()
 
                 # Print aggregation step
                 agg_print = f"{aggregate_step + 1}/{federated_c['aggregation_count']}"
@@ -370,32 +361,33 @@ def main_loop(args):
                 old_buffers = list(process_buffers)
 
             finally:
-                # Stop tracking emissions
-                emissions = tracker.stop()
-                print_l(f"Total CO₂ emissions: {emissions} kg")
-                try:
-                    # Read the temporary emissions report
-                    temp_df = pd.read_csv(f"{emission_output_dir}/emissions.csv")
+                aux = None
+            #     # Stop tracking emissions
+            #     # emissions = tracker.stop()
+            #     # print_l(f"Total CO₂ emissions: {emissions} kg")
+            #     try:
+            #         # Read the temporary emissions report
+            #         temp_df = pd.read_csv(f"{emission_output_dir}/emissions.csv")
 
-                    # Remove the temporary emissions file
-                    os.remove(f"{emission_output_dir}/emissions.csv")
+            #         # Remove the temporary emissions file
+            #         os.remove(f"{emission_output_dir}/emissions.csv")
 
-                    # Add the aggregate_step column
-                    temp_df['aggregate_step'] = aggregate_step
+            #         # Add the aggregate_step column
+            #         temp_df['aggregate_step'] = aggregate_step
 
-                    # Determine the write mode based on the aggregate_step
-                    write_mode = 'w' if aggregate_step == 0 else 'a'
+            #         # Determine the write mode based on the aggregate_step
+            #         write_mode = 'w' if aggregate_step == 0 else 'a'
 
-                    # Write or append the updated DataFrame to the main CSV
-                    with open(f"{emission_output_dir}/emissions_report.csv", write_mode) as f:
-                        temp_df.to_csv(f, header=(write_mode == 'w'), index=False)
-                except Exception as e:
-                    print_l(f"Error saving emissions report")
+            #         # Write or append the updated DataFrame to the main CSV
+            #         with open(f"{emission_output_dir}/emissions_report.csv", write_mode) as f:
+            #             temp_df.to_csv(f, header=(write_mode == 'w'), index=False)
+            #     except Exception as e:
+            #         print_l(f"Error saving emissions report")
 
-        # Save the aggregated data
-        if eval_c['save_aggregate_rewards']:
-            save_to_csv(rewards, 'outputs/rewards.csv')
-            save_to_csv(output_values, 'outputs/output_values.csv')
+        # # Save the aggregated data
+        # if eval_c['save_aggregate_rewards']:
+        #     save_to_csv(rewards, 'outputs/rewards.csv')
+        #     save_to_csv(output_values, 'outputs/output_values.csv')
 
     # In evaluation mode, we don't need to train, we just evaluate the already saved model
     elif run_mode == "Evaluating":
@@ -421,14 +413,14 @@ def main_loop(args):
         for aggregate_step in range(federated_c['aggregation_count_eval']):
             try:
                 # Start tracking emissions
-                tracker = EmissionsTracker(
-                    output_dir=emission_output_dir,
-                    save_to_file=f"emissions.csv",  # Temporary file
-                    tracking_mode='process',
-                    allow_multiple_runs=True,
-                    log_level='error'
-                )
-                tracker.start()
+                # tracker = EmissionsTracker(
+                #     output_dir=emission_output_dir,
+                #     save_to_file=f"emissions.csv",  # Temporary file
+                #     tracking_mode='process',
+                #     allow_multiple_runs=True,
+                #     log_level='error'
+                # )
+                # tracker.start()
 
                 # Check if we have only one zone - if so, don't use multiprocessing
                 agg_print = f"{aggregate_step + 1}/{federated_c['aggregation_count_eval']}"
@@ -522,27 +514,28 @@ def main_loop(args):
                 old_buffers = list(process_buffers)
 
             finally:
-                # Stop tracking emissions
-                emissions = tracker.stop()
-                print_l(f"Total CO₂ emissions: {emissions} kg")
-                try:
-                    # Read the temporary emissions report
-                    temp_df = pd.read_csv(f"{emission_output_dir}/emissions.csv")
+                aux = None
+            #     # # Stop tracking emissions
+            #     # emissions = tracker.stop()
+            #     # print_l(f"Total CO₂ emissions: {emissions} kg")
+            #     try:
+            #         # Read the temporary emissions report
+            #         temp_df = pd.read_csv(f"{emission_output_dir}/emissions.csv")
 
-                    # Remove the temporary emissions file
-                    os.remove(f"{emission_output_dir}/emissions.csv")
+            #         # Remove the temporary emissions file
+            #         os.remove(f"{emission_output_dir}/emissions.csv")
 
-                    # Add the aggregate_step column
-                    temp_df['aggregate_step'] = aggregate_step
+            #         # Add the aggregate_step column
+            #         temp_df['aggregate_step'] = aggregate_step
 
-                    # Determine the write mode based on the aggregate_step
-                    write_mode = 'w' if aggregate_step == 0 else 'a'
+            #         # Determine the write mode based on the aggregate_step
+            #         write_mode = 'w' if aggregate_step == 0 else 'a'
 
-                    # Write or append the updated DataFrame to the main CSV
-                    with open(f"{emission_output_dir}/emissions_report.csv", write_mode) as f:
-                        temp_df.to_csv(f, header=(write_mode == 'w'), index=False)
-                except Exception as e:
-                    print_l(f"Error saving emissions report")
+            #         # Write or append the updated DataFrame to the main CSV
+            #         with open(f"{emission_output_dir}/emissions_report.csv", write_mode) as f:
+            #             temp_df.to_csv(f, header=(write_mode == 'w'), index=False)
+            #     except Exception as e:
+            #         print_l(f"Error saving emissions report")
 
     # Print total run time
     print_et(f'Experiment_number: {experiment_number}, run time', start_time, )
@@ -569,6 +562,7 @@ if __name__ == '__main__':
     parser.add_argument('-verb','--verbose', type=bool, default=False, help='Verbose')
     parser.add_argument('-eval', type=bool, default=False, help='Evaluate the model')
     parser.add_argument('-profile', type=bool, default=False, help='Profile the code')
+    parser.add_argument('-server', type=str, default='DRAC', help='Choose between DRAC or Local server. By default is DRAC.')
     args = parser.parse_args()
 
     if args.profile:

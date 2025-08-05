@@ -4,13 +4,10 @@
 #SBATCH --error=experiments/Exp_4000/error.log
 #SBATCH -A def-mcapretz
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=4
-#SBATCH --time=02:00:00
+#SBATCH --cpus-per-task=6
+#SBATCH --time=00:10:00
 #SBATCH --mem=6G
 
-
-#SBATCH --mail-type=FAIL,TIME_LIMIT
-#SBATCH --mail-user=epigou@uwo.ca
 
 echo "Starting training for experiment 4000"
 

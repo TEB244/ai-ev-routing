@@ -104,7 +104,7 @@ def save_temps(coords_list: list, seed_list: list):
 
                     print(f"Saving temp for {coords}, {seed}, {season}")
 
-                    temp = get_temperature(season, coords, np.random.default_rng(seed), seed)
+                    temp = get_temperature(server, season, coords, np.random.default_rng(seed), seed)
                     csvwriter.writerow([coords[0], coords[1], season, seed, temp])
 
 def get_temps_from_file(coords: list, seed: int, season: str):
@@ -128,7 +128,7 @@ def get_temps_from_file(coords: list, seed: int, season: str):
     # If no matching entry is found, raise an exception
     raise Exception("Temperature data not found in CSV file")
 
-def get_temperature(season: str, coords: list, rng: np.random.Generator, seed: int) -> float:
+def get_temperature(server:str, season: str, coords: list, rng: np.random.Generator, seed: int) -> float:
     """
     Get the average temperature for the given season and coordinates.
 
@@ -165,37 +165,40 @@ def get_temperature(season: str, coords: list, rng: np.random.Generator, seed: i
         # Generate a random day within the month
         day = rng.integers(1, 28)  # Assuming 28 days to avoid issues with different month lengths
         date = datetime.date(2023, month, day).isoformat()
-        
-        try:        
-            response = requests.get(
-                closest_city['url'],
-                params={
-                    'refresh_count': 1,
-                    'browser_zone': 'Eastern Daylight Time',
-                    'date': date
-                }
-            )
-            response.raise_for_status()  # Raise an HTTPError for bad responses
-            data = response.json()
-            
-            # Extract the temperature data
-            if 'rows' in data:
-                for row in data['rows']:
-                    if 'c' in row and len(row['c']) > 1:
-                        temp = row['c'][1]['v']
-                        if temp is not None:
-                            temperatures.append(temp)
-            else:
-                print(f"No temperature data available for date {date}: {data}")
-        except requests.exceptions.RequestException:
-            print(f"Temperature request failed for date {date}. Using locally saved temp data instead.")
+        if server=='DRAC':
+            print(f"Using locally saved temp data on DRAC.")
             return get_temps_from_file(coords, seed, season)
-        except ValueError:
-            print(f"Error processing JSON response for date {date}. Using locally saved temp data instead.")
-            return get_temps_from_file(coords, seed, season)
-        except Exception:
-            print(f"Generic error for temperature request on date {date}. Using locally saved temp data instead.")
-            return get_temps_from_file(coords, seed, season)
+        else:
+            try:        
+                response = requests.get(
+                    closest_city['url'],
+                    params={
+                        'refresh_count': 1,
+                        'browser_zone': 'Eastern Daylight Time',
+                        'date': date
+                    }
+                )
+                response.raise_for_status()  # Raise an HTTPError for bad responses
+                data = response.json()
+                
+                # Extract the temperature data
+                if 'rows' in data:
+                    for row in data['rows']:
+                        if 'c' in row and len(row['c']) > 1:
+                            temp = row['c'][1]['v']
+                            if temp is not None:
+                                temperatures.append(temp)
+                else:
+                    print(f"No temperature data available for date {date}: {data}")
+            except requests.exceptions.RequestException:
+                print(f"Temperature request failed for date {date}. Using locally saved temp data instead.")
+                return get_temps_from_file(coords, seed, season)
+            except ValueError:
+                print(f"Error processing JSON response for date {date}. Using locally saved temp data instead.")
+                return get_temps_from_file(coords, seed, season)
+            except Exception:
+                print(f"Generic error for temperature request on date {date}. Using locally saved temp data instead.")
+                return get_temps_from_file(coords, seed, season)
 
     # Raise an exception if no temperature data was fetched
     if not temperatures:
@@ -209,7 +212,7 @@ class EnvironmentClass:
     Class representing the environment for EV routing and charging simulation.
     """
 
-    def __init__(self, config_fname: str, seed: int, sub_seed: int, zone: int, device: torch.device, dtype: torch.dtype = torch.float32):
+    def __init__(self, config_fname: str, seed: int, sub_seed: int, zone: int, server: str, device: torch.device, dtype: torch.dtype = torch.float32):
         """
         Initialize the environment with configuration, device, and dtype.
 
@@ -233,7 +236,7 @@ class EnvironmentClass:
         # Seeding environment random generator
         rng = np.random.default_rng(sub_seed)
 
-        self.temperature = get_temperature(config['season'], config['coords'][zone], rng, seed)
+        self.temperature = get_temperature(server, config['season'], config['coords'][zone], rng, seed)
 
         self.init_ev_info(config, self.temperature, rng)
 
@@ -541,9 +544,9 @@ class EnvironmentClass:
 
         
         # Calculate reward as -(distance * 100 + peak traffic + energy used / 100)
-        distance_factor = distances_per_car[-1].numpy() * self.distance_scale
-        peak_traffic = np.max(traffic_per_charger.numpy()) * self.traffic_scale
-        energy_used = energy_used.cpu().numpy() * self.energy_scale
+        distance_factor = distances_per_car[-1] * self.distance_scale
+        peak_traffic = torch.max(traffic_per_charger) * self.traffic_scale
+        energy_used = energy_used * self.energy_scale
         
         # Note that by doing (* 100) and (/ 100) we are scaling each factor of the reward to be around 0-10 on average
         reward_scale = (self.timestep + 1) if self.reward_version == 2 else 1
@@ -557,7 +560,7 @@ class EnvironmentClass:
         self.traffic_results = traffic_per_charger.numpy()
         self.battery_levels_results = battery_levels.numpy()
         self.distances_results = distances_per_car.numpy()
-        self.arrived_at_final = arrived_at_final
+        self.arrived_at_final = arrived_at_final[0]
         self.energy_used = energy_used
 
         self.done = done
@@ -568,7 +571,7 @@ class EnvironmentClass:
         return done, rewards, self.timestep, self.arrived_at_final
 
     def get_odt_info(self):
-        return self.arrived_at_final[0,:]
+        return self.arrived_at_final
 
     # def get_full_results(self) -> tuple:
     #     """
@@ -668,7 +671,7 @@ class EnvironmentClass:
                 self.max_peak_ep = max_peak
                 self.max_station_id = station_id
 
-            self.reward_episode += self.simulation_reward
+            self.reward_episode += self.simulation_reward.numpy()
             self.distances_episode += self.distances_results[-1,:]
             for agent_idx in range(self.num_cars):
                 duration_agent = self.distances_results[:,agent_idx]
@@ -871,6 +874,8 @@ class EnvironmentClass:
         self.local_paths = []
 
         self.timestep += 1
+        if self.timestep > self.max_steps:
+            raise ValueError("Timesteps higher than max simulation steps, which will create an error on how to store data.")
 
         # Update starting routes
         if self.tokens != None:
@@ -898,6 +903,7 @@ class EnvironmentClass:
 
         # To record elapsed time
         self.timer.start_timer()
+        return self.timestep
 
 
     def reset_episode(self, chargers: np.ndarray, routes: np.ndarray, unique_chargers: np.ndarray):
@@ -965,11 +971,13 @@ class EnvironmentClass:
         self.store_charges_needed = []
         self.store_local_paths = []
 
-if __name__ == "__main__":
-    seeds = [1234, 5555, 2020, 2468, 11110, 4040, 3702, 16665, 6002, 6060]
-    coords_list = [[43.02120034946083, -81.28349087468504],
-                   [43.004969336049854, -81.18631870502043],
-                   [42.95923445066671, -81.26016049362336],
-                   [42.98111190139387, -81.30953935839466],
-                   [42.9819404397449, -81.2508736429095]]
-    save_temps(coords_list, seeds)
+# if __name__ == "__main__":
+#     seeds = [1234, 5555, 2020, 2468, 11110, 4040, 3702, 16665, 6002, 6060]
+#     coords_list = [[43.02120034946083, -81.28349087468504],
+#                    [43.004969336049854, -81.18631870502043],
+#                    [42.95923445066671, -81.26016049362336],
+#                    [42.98111190139387, -81.30953935839466],
+#                    [42.9819404397449, -81.2508736429095]]
+
+#     save_temps(coords_list, seeds)
+

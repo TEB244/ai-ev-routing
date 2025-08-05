@@ -247,7 +247,7 @@ def train_reinforce(queue,
             sim_done, timestep_reward, timestep_counter,\
                         arrived_at_final = environment.simulate_routes()
             
-            dones.extend(arrived_at_final.tolist())
+            dones.extend(arrived_at_final)
 
             # Accumulate episode rewards
             if timestep_counter == 0:
@@ -270,7 +270,7 @@ def train_reinforce(queue,
                     states[-num_cars + car_idx],
                     distributions_unmodified[-num_cars + car_idx],
                     rew,
-                    arrived_at_final[0, car_idx]
+                    arrived_at_final[car_idx]
                 ))
 
             if save_offline_data:

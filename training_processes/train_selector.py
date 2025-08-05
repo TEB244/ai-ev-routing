@@ -46,7 +46,7 @@ def train_route(queue, ev_info, experiment_number, chargers, environment, routes
         print(f'algorithm dm {algorithm_dm}')
 
         if algorithm_dm == 'DQN':
-            from training_processes.dqn import train_dqn as train
+            from training_processes.dqn_v2 import train_dqn as train
 
         elif algorithm_dm == 'ODT':
             from training_processes.odt.train_odt import train_odt as train

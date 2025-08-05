@@ -153,7 +153,7 @@ def get_actions(state, q_networks, random_threshold, epsilon, episode_index, age
         else:
             action_values = q_networks[agent_index](state)  # Greedy action
 
-    return action_values
+    return action_values.detach()
 
 def soft_update(target_network, source_network, tau=0.001):
 

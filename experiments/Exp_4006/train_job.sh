@@ -4,13 +4,10 @@
 #SBATCH --error=experiments/Exp_4006/error.log
 #SBATCH -A def-mcapretz
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=4
-#SBATCH --time=90:00:00
-#SBATCH --mem=16G
+#SBATCH --cpus-per-task=6
+#SBATCH --time=10:00:00
+#SBATCH --mem=8G
 
-
-#SBATCH --mail-type=FAIL,TIME_LIMIT
-#SBATCH --mail-user=lhartma8@uwo.ca
 
 echo "Starting training for experiment 4006"
 
@@ -22,5 +19,5 @@ source ~/envs/merl_env/bin/activate
 # Enable multi-threading
 export OMP_NUM_THREADS=2
 
-python app_v2.py  -e 4006 -d "/home/hartman/scratch/metrics/Exp" 
+python main.py  -e 4006 -d "/home/sgomezro/scratch/metrics/Exp"  
     

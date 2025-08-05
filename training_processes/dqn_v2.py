@@ -1,24 +1,17 @@
 import torch
 import torch.optim as optim
 import numpy as np
-import collections
-from collections import namedtuple, deque, defaultdict
 import os
 import time
 import copy
 import pickle
 import h5py
-import tracemalloc
 
 from decision_makers.dqn_agent import initialize, agent_learn, get_actions, soft_update, save_model
 from environment.data_loader import load_config_file, save_to_csv
 from environment._pathfinding import haversine
-from .odt.odt_helpers.utils import format_data, save_to_h5, save_temp_checkpoint
+from misc.utils import format_data, save_to_h5, save_temp_checkpoint
 from training_processes.writer_proccess import printer_queue
-
-
-# Define the experience tuple
-Experience = namedtuple("Experience", field_names=["state", "distribution", "reward", "next_state", "done"])
 
 def train_dqn(queue, 
               ev_info, 
@@ -74,7 +67,7 @@ def train_dqn(queue,
             - List of average output values for each episode.
     """
 
-    tracemalloc.start()
+    print(f'Running DQN V2')
 
     # Getting Neural Network parameters
     config_fname = f'experiments/Exp_{experiment_number}/config.yaml'
@@ -89,6 +82,7 @@ def train_dqn(queue,
     num_episodes = nn_c['num_episodes']
     batch_size   = int(nn_c['batch_size'])
     buffer_limit = int(nn_c['buffer_limit'])
+    max_timesteps = environment.max_steps
     layers = nn_c['layers']
     aggregation_count = federated_c['aggregation_count'] if not args.eval else federated_c['aggregation_count_eval']
 
@@ -151,7 +145,7 @@ def train_dqn(queue,
         optimizers.append(optimizer)
 
     else: # Assign unique agent for each car
-        num_agents = environment.num_cars
+        num_agents = num_cars
         for agent_ind in range(num_agents):
             # Initialize networks
             q_network, target_q_network = initialize(state_dimension, action_dim, layers, device)  
@@ -173,7 +167,10 @@ def train_dqn(queue,
 
     random_threshold = dqn_rng.random((num_episodes, num_cars))
 
-    buffers = [deque(maxlen=buffer_limit) for _ in range(num_cars)] # Initialize replay buffer with fixed size
+
+    buffers = [
+        ExperienceBuffer(buffer_limit, state_dimension, action_dim, device=device) for _ in range(num_cars)]
+
 
     if old_buffers is not None and len(old_buffers) > 0:
         buffers = old_buffers
@@ -198,17 +195,17 @@ def train_dqn(queue,
                     'terminals_car': [],
                     'zone': zone_index,
                     'aggregation': aggregation_num,
-                    'episode': i, 
+                    'episode': i, # Critical: Keep this inside the loop for correct episode tracking
                     'car_idx': car_idx
                 }
                 for car_idx in range(num_cars)
             ])
 
-        distributions = []
-        distributions_unmodified = []
-        states = []
-        rewards = []
-        dones = []
+        distributions = torch.zeros((num_cars, max_timesteps, action_dim), dtype=dtype, device=device)
+        actions = torch.zeros((num_cars, max_timesteps, action_dim), dtype=dtype, device=device)
+        states  = torch.zeros((num_cars, max_timesteps+1, state_dimension), dtype=dtype, device=device)
+        rewards = torch.zeros((num_cars, max_timesteps), dtype=dtype, device=device)
+        dones   = torch.zeros((num_cars, max_timesteps), dtype=dtype, device=device)
         
         # Episode includes every car reaching their destination
         environment.reset_episode(chargers, routes, unique_chargers)  
@@ -219,7 +216,7 @@ def train_dqn(queue,
         list_rewards= []
 
         while not sim_done:  # Keep going until every EV reaches its destination
-            environment.init_routing()
+            timestep = environment.init_routing()
             start_time_step = time.time()
 
             # Build path for each EV
@@ -232,32 +229,30 @@ def train_dqn(queue,
                     )), None)
 
                 ########### Starting environment routing
-                state = environment.reset_agent(car_idx)
-                states.append(state)  # Track states
-
-                if save_offline_data:
-                    car_traj['observations'].append(state)
-
+                state_np = environment.reset_agent(car_idx)
+                state = torch.tensor(state_np, dtype=dtype, device=device)  # Convert state to tensor
+                states[car_idx, timestep] = state  # Save state for each car on states
                 t1 = time.time()
 
                 ####### Getting actions from agents
-                state = torch.tensor(state, dtype=dtype, device=device)  # Convert state to tensor
+                
                 # Get the action values from the agent
                 action_values = get_actions(state, q_networks, random_threshold, epsilon, i,\
                                             car_idx, device, agent_by_zone)  
 
                 t2 = time.time()
-                distribution = action_values
                 if save_offline_data:
+                    #Save state for each car
+                    car_traj['observations'].append(state_np)
                     #Save unmodified action
-                    car_traj['actions'].append(distribution.detach().cpu().numpy().tolist()) 
+                    car_traj['actions'].append(action_values.detach().cpu().numpy().tolist()) 
                 
                 # Track outputs before the sigmoid application
-                distributions_unmodified.append(distribution.detach().cpu().numpy().tolist()) 
+                actions[car_idx, timestep] = action_values
                 # Apply sigmoid function to the entire tensor
-                distribution = torch.sigmoid(distribution)
+                distribution = torch.sigmoid(action_values)
                 # Convert to list and append
-                distributions.append(distribution.detach().cpu().numpy().tolist()) 
+                distributions[car_idx, timestep] = distribution 
 
                 t3 = time.time()
                 environment.generate_paths(distribution, fixed_attributes, car_idx)
@@ -274,12 +269,13 @@ def train_dqn(queue,
                                     allow_pickle=True).tolist()
 
             paths_copy = None
-            paths_copy = copy.deepcopy(environment.paths)
+            paths_copy = copy.deepcopy(environment.paths) # Check with Lucas, is still needed?
 
             # Calculate the average values of the output neurons for this episode
-            episode_avg_output_values = np.mean(distributions_unmodified, axis=0)
+            # episode_avg_output_values = np.mean(actions, axis=0)
+            episode_avg_output_values = actions[:,:timestep,:].mean(axis=(0, 1))
             avg_output_values.append((episode_avg_output_values.tolist(), i,\
-                                      aggregation_num, zone_index, main_seed))
+                                      aggregation_num, zone_index, main_seed)) # Double check, likely error src
 
             if display_training_times:
                 print_et('Get Paths', time_start_paths)
@@ -290,21 +286,21 @@ def train_dqn(queue,
             sim_done, timestep_reward, timestep_counter,\
                         arrived_at_final = environment.simulate_routes()
 
-            dones.append(arrived_at_final.numpy().tolist())
+            dones[:,timestep] = arrived_at_final
 
-            if timestep_counter == 0:
+            if timestep_counter == 0: # Needs double check with Lucas, something is wrong here
                 episode_rewards = np.expand_dims(timestep_reward,axis=0)
             else:
                 episode_rewards = np.vstack((episode_rewards,timestep_reward))
             
             # Train the model only using the average of all timestep rewards
-            if 'average_rewards_when_training' in nn_c and nn_c['average_rewards_when_training']: 
+            if nn_c['average_rewards_when_training']: 
                 avg_reward = timestep_reward.sum(axis=0) / len(timestep_reward)
                 timestep_reward_avg = [avg_reward for _ in timestep_reward]
-                rewards.extend(timestep_reward_avg)
+                rewards[:,timestep] = timestep_reward_avg
             # Train the model using the rewards from it's own experiences
             else:
-                rewards.extend(timestep_reward)
+                rewards[:,timestep] = timestep_reward
 
             time_step_time = time.time() - start_time_step
 
@@ -322,17 +318,36 @@ def train_dqn(queue,
             if timestep_counter >= environment.max_steps:
                 raise Exception("MAX TIME-STEPS EXCEEDED!")
 
+        # Saving last state for next state
+        for car_idx in range(num_cars): # For each car
+            states[car_idx, timestep+1] = state  # Save state for each car on states
+        
         ########### STORE EXPERIENCES ###########
 
-        car_dones = [item for sublist in dones for item in sublist]
+        # car_dones = [item for sublist in dones for item in sublist]
+        
 
-        for d in range(len(distributions_unmodified)):
+        # for d in range(len(actions)):
 
-            buffers[d % num_cars].append(Experience(states[d], 
-                                                    distributions_unmodified[d],\
-                                                    rewards[d],
-                                                    states[(d + num_cars) if d + num_cars < len(states) else d],
-                                                    True if car_dones[d] == 1 else False))  # Store experience
+        #     # buffers[d % num_cars].append(Experience(states[d], 
+        #     #                                         actions[d],\
+        #     #                                         rewards[d],
+        #     #                                         states[(d + num_cars) if d + num_cars < len(states) else d],
+        #     #                                         True if car_dones[d] == 1 else False))  # Store experience
+        #     print(f'line 341 d {d}')
+        #     action = actions[d]
+        #     next_state = states[d % num_cars]
+        #     car_done = True if dones[d % num_cars] == 1 else False
+        #     buffers[d % num_cars].add(state[d], action, rewards[d], next_state, car_done)
+
+        for car_idx in range(num_cars):
+            state_car  = states[car_idx,:timestep]
+            action_car = actions[car_idx,:timestep]
+            reward_car = rewards[car_idx,:timestep]
+            next_state = states[car_idx,1:timestep+1]
+            done_car   = dones[car_idx,:timestep]
+            buffers[car_idx].add(state_car, action_car, reward_car, next_state, done_car, timestep)
+        
 
         st = time.time()
 
@@ -342,9 +357,11 @@ def train_dqn(queue,
             if len(buffers[agent_ind]) >= batch_size: # Buffer is full enough
                 trained = True
 
-                mini_batch = None
-                mini_batch = dqn_rng.choice(np.array([Experience(exp.state.cpu().numpy(), exp.distribution, exp.reward, exp.next_state.cpu().numpy(), exp.done) if isinstance(exp.state, torch.Tensor) else exp for exp in buffers[agent_ind]], dtype=object), batch_size, replace=False)
-                experiences = map(np.stack, zip(*mini_batch))  # Format experiences
+                # mini_batch = None
+                # mini_batch = dqn_rng.choice(np.array([Experience(exp.state.cpu().numpy(), exp.distribution, exp.reward, exp.next_state.cpu().numpy(), exp.done) if isinstance(exp.state, torch.Tensor) else exp for exp in buffers[agent_ind]], dtype=object), batch_size, replace=False)
+                # experiences = map(np.stack, zip(*mini_batch))  # Format experiences
+
+                experiences = buffers[agent_ind].sample(batch_size, dqn_rng)
 
                 # Update networks
                 if agent_by_zone:
@@ -388,7 +405,7 @@ def train_dqn(queue,
                         os.makedirs(base_path)
 
         if save_offline_data and (i + 1) % eps_per_save == 0:
-            metrics_base_path = f"{eval_c['save_path_metrics']}_{experiment_number}"
+            metrics_base_path = f"{eval_c['save_path_metrics'][arg.server]}_{experiment_number}"
             dataset_path = f"{metrics_base_path}/data_zone_{zone_index}.h5"
             checkpoint_dir = os.path.join(os.path.dirname(metrics_base_path),\
                                           f"temp/Exp_{experiment_number}_checkpoints")
@@ -437,9 +454,6 @@ def train_dqn(queue,
             os.remove(temp_path)
             trajectories.clear()
 
-        # current, peak = tracemalloc.get_traced_memory()
-        # print(f"Current memory usage: {current / 1024 ** 2:.2f} MB")
-        # print(f"Peak memory usage: {peak / 1024 ** 2:.2f} MB")
         
         ### Saving metrics per episode ###
         station_data, agent_data = environment.get_data()
@@ -459,14 +473,14 @@ def train_dqn(queue,
                 print_l(f'Zone: {zone_index + 1} - New Best: {best_avg}')
 
         avg_ir = 0
-        ir_count = 0
-        for distribution in distributions:
-            for out in distribution:
-                avg_ir += out
-                ir_count += 1
-        avg_ir /= ir_count
+        # ir_count = 0
+        # for distribution in distributions:
+        #     for out in distribution:
+        #         avg_ir += out
+        #         ir_count += 1
+        # avg_ir /= ir_count
 
-        
+
         if verbose:
             et = time.time() - start_time
             to_print =  f"(Agg.: {aggregation_num + 1} - Zone: {zone_index + 1}"+\
@@ -482,3 +496,68 @@ def train_dqn(queue,
     del q_networks, target_q_networks, optimizers
     torch.cuda.empty_cache()  # if using GPU
     return weights, avg_rewards, avg_output_values, buffers
+
+
+
+class ExperienceBuffer:
+    def __init__(self, buffer_limit, state_dim, action_dim, device='cpu', dtype=torch.float32):
+        self.size = buffer_limit
+        self.index = 0
+        self.full = False
+        self.device = device
+        self.dtype = dtype
+
+        self.states = torch.zeros((buffer_limit, state_dim), dtype=dtype, device=device)
+        self.actions = torch.zeros((buffer_limit, action_dim), dtype=dtype, device=device)
+        self.rewards = torch.zeros((buffer_limit,), dtype=dtype, device=device)
+        self.next_states = torch.zeros((buffer_limit, state_dim), dtype=dtype, device=device)
+        self.dones = torch.zeros((buffer_limit,), dtype=torch.bool, device=device)
+
+    def add(self, states, actions, rewards, next_states, dones, timestep):
+        # Handle wrap-around (circular buffer logic)
+        end_index = self.index + timestep
+        if end_index <= self.size:
+            self.states[self.index:end_index] = states
+            self.actions[self.index:end_index] = actions
+            self.rewards[self.index:end_index] = rewards
+            self.next_states[self.index:end_index] = next_states
+            self.dones[self.index:end_index] = dones
+        else:
+            first_part = self.size - self.index
+            second_part = end_index % self.size
+    
+            # Wraparound for all components
+            self.states[self.index:] = states[:first_part]
+            self.states[:second_part] = states[first_part:]
+    
+            self.actions[self.index:] = actions[:first_part]
+            self.actions[:second_part] = actions[first_part:]
+    
+            self.rewards[self.index:] = rewards[:first_part]
+            self.rewards[:second_part] = rewards[first_part:]
+    
+            self.next_states[self.index:] = next_states[:first_part]
+            self.next_states[:second_part] = next_states[first_part:]
+    
+            self.dones[self.index:] = dones[:first_part]
+            self.dones[:second_part] = dones[first_part:]
+    
+        self.index = end_index % self.size
+        if end_index >= self.size:
+            self.full = True
+
+    def sample(self, batch_size, rng):
+        max_len = self.size if self.full else self.index
+        indices = torch.tensor(rng.choice(max_len, size=batch_size, replace=False), device=self.device)
+
+        return (
+            self.states[indices],
+            self.actions[indices],
+            self.rewards[indices],
+            self.next_states[indices],
+            self.dones[indices]
+        )
+
+    def __len__(self):
+        return self.size if self.full else self.index
+
