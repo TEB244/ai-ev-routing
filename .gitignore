@@ -190,3 +190,4 @@ update_config_files.py
 update_odt_config.py
 profile.out
 update_all_config.py
+.vscode/extensions.json
