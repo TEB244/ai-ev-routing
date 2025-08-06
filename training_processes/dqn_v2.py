@@ -10,7 +10,7 @@ import h5py
 from decision_makers.dqn_agent import initialize, agent_learn, get_actions, soft_update, save_model
 from environment.data_loader import load_config_file, save_to_csv
 from environment._pathfinding import haversine
-from misc.utils import format_data, save_to_h5, save_temp_checkpoint
+from .odt.odt_helpers.utils import format_data, save_to_h5, save_temp_checkpoint
 from training_processes.writer_proccess import printer_queue
 
 def train_dqn(queue, 
