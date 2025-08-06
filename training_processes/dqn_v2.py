@@ -283,15 +283,14 @@ def train_dqn(queue,
             ########### GET SIMULATION RESULTS ###########
 
             # Run simulation and get results
-            sim_done, timestep_reward, timestep_counter,\
-                        arrived_at_final = environment.simulate_routes()
+            sim_done, timestep_reward, timestep_counter, arrived_at_final = environment.simulate_routes()
 
             dones[:,timestep] = arrived_at_final
 
-            if timestep_counter == 0: # Needs double check with Lucas, something is wrong here
-                episode_rewards = np.expand_dims(timestep_reward,axis=0)
+            if timestep == 0:
+                episode_rewards = torch.unsqueeze(timestep_reward, 0)
             else:
-                episode_rewards = np.vstack((episode_rewards,timestep_reward))
+                episode_rewards = torch.cat((episode_rewards, torch.unsqueeze(timestep_reward, 0)), dim=0)
             
             # Train the model only using the average of all timestep rewards
             if nn_c['average_rewards_when_training']: 
@@ -486,7 +485,7 @@ def train_dqn(queue,
             to_print =  f"(Agg.: {aggregation_num + 1} - Zone: {zone_index + 1}"+\
                         f" - Episode: {i + 1}/{num_episodes})\t"+\
                         f" et: {int(et // 3600):02d}h{int((et % 3600) // 60):02d}m{int(et % 60):02d}s"+\
-                        f"- Avg. Reward {round(avg_reward, 3):0.3f} - Time-steps: {timestep_counter},"+\
+                        f"- Avg. Reward {round(float(avg_reward.cpu().numpy()), 3):0.3f} - Time-steps: {timestep_counter},"+\
                         f" Avg. IR: {round(avg_ir, 3):0.3f} - Epsilon: {round(epsilon, 3):0.3f}"
             print_l(to_print)
 

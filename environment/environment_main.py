@@ -440,10 +440,10 @@ class EnvironmentClass:
 
         mini_step_count = 0
         tokens_size = tokens.shape
-        paths = torch.empty((0, tokens_size[0], tokens_size[1]))
-        traffic_per_charger = torch.empty((0, destinations.shape[0]))
-        battery_levels = torch.empty((0, battery.shape[0]))
-        distances_per_car = torch.zeros(1, tokens.shape[0])
+        paths = torch.empty((0, tokens_size[0], tokens_size[1]), device=self.device)
+        traffic_per_charger = torch.empty((0, destinations.shape[0]), device=self.device)
+        battery_levels = torch.empty((0, battery.shape[0]), device=self.device)
+        distances_per_car = torch.zeros(1, tokens.shape[0], device=self.device)
 
         energy_used = torch.zeros(self.num_cars, device=self.device, dtype=self.dtype)
 
@@ -461,9 +461,9 @@ class EnvironmentClass:
             tokens, distance_travelled = move_tokens(tokens, moving, actions, destinations, self.step_size)
 
             # Track token position at each timestep and how far they traveled
-            paths = torch.cat([paths, tokens.cpu().unsqueeze(0)], dim=0)
-            distances_per_car = torch.cat([distances_per_car, distance_travelled.cpu().unsqueeze(0) +\
-                                           distances_per_car[-1, :]], dim=0)
+            paths = torch.cat([paths, tokens.unsqueeze(0)], dim=0)
+            distances_per_car = torch.cat([distances_per_car, distance_travelled.unsqueeze(0) +\
+                                           distances_per_car[-1, :]],  dim=0)
 
             # Get Nx1 matrix of distances
             distances = get_distance(tokens, destinations, actions)
@@ -475,7 +475,7 @@ class EnvironmentClass:
             traffic_level = get_traffic(stops, destinations, arrived)
 
             # Track traffic for each timestep
-            traffic_per_charger = torch.cat([traffic_per_charger, traffic_level.cpu().unsqueeze(0)], dim=0)
+            traffic_per_charger = torch.cat([traffic_per_charger, traffic_level.unsqueeze(0)], dim=0)
 
             # Get charging or discharging rate for each car as Nx1 matrix
             charging_rates = get_charging_rates(stops, traffic_level, arrived, capacity, self.decrease_rates,\
@@ -487,14 +487,12 @@ class EnvironmentClass:
 
             # Update the battery level of each car
             battery = update_battery(battery, charging_rates, arrived_at_final)
-            battery_levels = torch.cat([battery_levels, battery.cpu().unsqueeze(0)], dim=0)
+            battery_levels = torch.cat([battery_levels, battery.unsqueeze(0)], dim=0)
 
             # Track energy used (absolute value of charging rates)
             energy_used += torch.abs(charging_rates)
 
             # Check if the car is at their target battery level
-            # Ensure target_battery_level is on the same device as battery
-            target_battery_level = target_battery_level.to(self.device)
             battery_charged = get_battery_charged(battery, target_battery_level, self.device)
 
             # Charging but ready to leave
@@ -550,16 +548,17 @@ class EnvironmentClass:
         
         # Note that by doing (* 100) and (/ 100) we are scaling each factor of the reward to be around 0-10 on average
         reward_scale = (self.timestep + 1) if self.reward_version == 2 else 1
+
         self.simulation_reward = -((distance_factor + peak_traffic + energy_used) / (reward_scale))
 
         # Save results in class
         self.tokens = tokens
         self.new_starting_battery = battery
         self.charging_status = charging_status #still_status: 1 if car is still charging and 0 if not
-        self.path_results = paths.numpy()
-        self.traffic_results = traffic_per_charger.numpy()
-        self.battery_levels_results = battery_levels.numpy()
-        self.distances_results = distances_per_car.numpy()
+        self.path_results = paths.cpu().numpy()
+        self.traffic_results = traffic_per_charger.cpu().numpy()
+        self.battery_levels_results = battery_levels.cpu().numpy()
+        self.distances_results = distances_per_car.cpu().numpy()
         self.arrived_at_final = arrived_at_final[0]
         self.energy_used = energy_used
 
@@ -671,7 +670,7 @@ class EnvironmentClass:
                 self.max_peak_ep = max_peak
                 self.max_station_id = station_id
 
-            self.reward_episode += self.simulation_reward.numpy()
+            self.reward_episode += self.simulation_reward.cpu().numpy()
             self.distances_episode += self.distances_results[-1,:]
             for agent_idx in range(self.num_cars):
                 duration_agent = self.distances_results[:,agent_idx]
@@ -734,7 +733,7 @@ class EnvironmentClass:
                                         agent_idx,
                                         car_model[0],
                                         self.distances_results[-1,agent_idx] * 100,
-                                        self.simulation_reward[agent_idx],
+                                        self.simulation_reward[agent_idx].cpu().numpy(),
                                         duration,
                                         self.battery_levels_results[:,agent_idx].mean(),
                                         self.battery_levels_results[-1,agent_idx],
