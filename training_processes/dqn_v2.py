@@ -70,7 +70,7 @@ def train_dqn(queue,
     print(f'Running DQN V2')
 
     # Getting Neural Network parameters
-    config_fname = f'experiments/Exp_{experiment_number}/config.yaml'
+    config_fname = f'experiments/Exp_{experiment_number:04d}/config.yaml'
     nn_c = load_config_file(config_fname)['nn_hyperparameters']
     eval_c = load_config_file(config_fname)['eval_config']
     federated_c = load_config_file(config_fname)['federated_learning_settings']
