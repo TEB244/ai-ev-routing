@@ -14,7 +14,6 @@ cma
 plotly
 jupyterlab
 tenacity
-jupyterlab-plotly
-codecarbon
+plotly
 python-dotenv
 h5py
