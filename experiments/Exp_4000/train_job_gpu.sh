@@ -2,7 +2,7 @@
 #SBATCH --job-name=Exp_4000_train_GPU
 #SBATCH --output=experiments/Exp_4000/output_GPU.log
 #SBATCH --error=experiments/Exp_4000/error_GPU.log
-#SBATCH -A  rrg-kgroling
+#SBATCH -A def-mcapretz
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=6
 #SBATCH --time=02:10:00
