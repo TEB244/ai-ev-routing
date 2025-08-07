@@ -1,12 +1,13 @@
 #!/bin/bash
-#SBATCH --job-name=Exp_4000_train
-#SBATCH --output=experiments/Exp_4000/output.log
-#SBATCH --error=experiments/Exp_4000/error.log
-#SBATCH -A def-mcapretz
+#SBATCH --job-name=Exp_4000_train_GPU
+#SBATCH --output=experiments/Exp_4000/output_GPU.log
+#SBATCH --error=experiments/Exp_4000/error_GPU.log
+#SBATCH -A  rrg-kgroling
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=6
 #SBATCH --time=02:10:00
 #SBATCH --mem=6G
+#SBATCH --gpus-per-node=1
 
 #SBATCH --mail-type=FAIL,TIME_LIMIT
 #SBATCH --mail-user=lhartma8@uwo.ca
@@ -21,5 +22,5 @@ source ~/envs/merl_env/bin/activate
 # Enable multi-threading
 export OMP_NUM_THREADS=2
 
-python main.py  -e 4000 -d "/home/sgomezro/scratch/metrics/Exp" -verb True
+python main.py -g 0 -e 4000 -d "/home/hartman/scratch/metrics/Exp" -verb True
     

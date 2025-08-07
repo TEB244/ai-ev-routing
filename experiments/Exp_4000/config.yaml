@@ -55,7 +55,7 @@ eval_config:
     Local: /storage_1/merl/metrics//Exp
   verbose: true
 federated_learning_settings:
-  aggregation_count: 3
+  aggregation_count: 50
   city_multiplier: 0.15
   model_multiplier: 0.5
   zone_multiplier: 0.35
@@ -65,7 +65,7 @@ nn_hyperparameters:
   buffer_limit: 150
   city_multiplier: 0.15
   discount_factor: 0.999
-  eps_per_save: 200
+  eps_per_save: 100
   epsilon: 1
   epsilon_decay: 0.999
   layers:
