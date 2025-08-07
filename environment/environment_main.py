@@ -244,8 +244,7 @@ class EnvironmentClass:
         self.num_cars = config['num_of_cars']
         self.num_chargers = config['num_of_chargers']
         self.step_size = config['step_size']
-        self.decrease_rates = torch.tensor(self.info['usage_per_hour'] / 70,\
-                                           dtype=float, device=self.device)
+        self.decrease_rates = torch.tensor(self.info['usage_per_hour'] / 70, dtype=float)
         self.increase_rate = config['increase_rate'] / 60
         self.max_steps = config['max_sim_steps']
         self.max_mini_steps = config['max_mini_sim_steps']
@@ -429,6 +428,7 @@ class EnvironmentClass:
         actions = self.actions
         moving = self.move
         target_battery_level = self.target_battery_level
+        decrease_rates = self.decrease_rates.to(self.device)
 
         if target_battery_level.size(1) == 0:
             target_battery_level = torch.zeros(target_battery_level.size(0), device=self.device).unsqueeze(1)
@@ -478,7 +478,7 @@ class EnvironmentClass:
             traffic_per_charger = torch.cat([traffic_per_charger, traffic_level.unsqueeze(0)], dim=0)
 
             # Get charging or discharging rate for each car as Nx1 matrix
-            charging_rates = get_charging_rates(stops, traffic_level, arrived, capacity, self.decrease_rates,\
+            charging_rates = get_charging_rates(stops, traffic_level, arrived, capacity, decrease_rates,\
                                                 self.increase_rate, self.dtype)
 
             # Track which cars have reached their final destination
@@ -567,7 +567,7 @@ class EnvironmentClass:
         #get rewards for episode
         rewards = self.get_rewards(population_mode=population_mode)
         
-        return done, rewards, self.timestep, self.arrived_at_final
+        return done, rewards.cpu(), self.timestep, self.arrived_at_final
 
     def get_odt_info(self):
         return self.arrived_at_final
@@ -969,6 +969,7 @@ class EnvironmentClass:
         self.store_paths = []
         self.store_charges_needed = []
         self.store_local_paths = []
+
 
 # if __name__ == "__main__":
 #     seeds = [1234, 5555, 2020, 2468, 11110, 4040, 3702, 16665, 6002, 6060]

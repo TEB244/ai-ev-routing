@@ -320,7 +320,7 @@ def train_dqn(queue,
         # Saving last state for next state
         for car_idx in range(num_cars): # For each car
             states[car_idx, timestep+1] = state  # Save state for each car on states
-        
+
         ########### STORE EXPERIENCES ###########
 
         # car_dones = [item for sublist in dones for item in sublist]
@@ -494,6 +494,16 @@ def train_dqn(queue,
     weights = [q_network.cpu().state_dict() for q_network in q_networks]
     del q_networks, target_q_networks, optimizers
     torch.cuda.empty_cache()  # if using GPU
+
+    # Move buffers to cpu before returning
+    for buf in buffers:
+        buf.states = buf.states.cpu()
+        buf.actions = buf.actions.cpu()
+        buf.rewards = buf.rewards.cpu()
+        buf.next_states = buf.next_states.cpu()
+        buf.dones = buf.dones.cpu()
+        buf.device = 'cpu'
+
     return weights, avg_rewards, avg_output_values, buffers
 
 
@@ -559,4 +569,3 @@ class ExperienceBuffer:
 
     def __len__(self):
         return self.size if self.full else self.index
-

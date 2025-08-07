@@ -13,6 +13,9 @@ import cProfile
 from collections import defaultdict
 import torch
 warnings.filterwarnings("ignore")
+import gc
+import tracemalloc
+tracemalloc.start()
 
 # Importing proprietary modules
 from environment.data_loader import *
@@ -25,7 +28,6 @@ from training_processes.writer_proccess import *
 # Setting for multiprocessing using pytorch
 import torch.multiprocessing as mp
 mp.set_sharing_strategy('file_system')
-mp.set_start_method('spawn', force=True)
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'TRUE'
 
 def main_loop(args):
@@ -313,10 +315,26 @@ def main_loop(args):
                         processes.append(process)
                         process.start()
 
-                    print("Join Processes")
+                    print("Started Training Processes")
 
                     for process in processes:
                         process.join()
+
+                    print("Joined Processes")
+
+                    gc.collect()
+                    leaked = []
+                    for obj in gc.get_objects():
+                        try:
+                            if torch.is_tensor(obj) and obj.is_cuda:
+                                leaked.append(obj)
+                        except Exception:
+                            pass
+
+                    if leaked:
+                        print(f"⚠️  {len(leaked)} live CUDA tensor(s) still allocated:")
+                    else:
+                        print("✅  No live CUDA tensors found.")
 
                     for p in processes:
                         if p.is_alive():
@@ -471,10 +489,26 @@ def main_loop(args):
                         processes.append(process)
                         process.start()
 
-                    print("Join Processes")
+                    print("Started Training Processes")
 
                     for process in processes:
                         process.join()
+
+                    print("Joined Training Processes")
+                    
+                    gc.collect()
+                    leaked = []
+                    for obj in gc.get_objects():
+                        try:
+                            if torch.is_tensor(obj) and obj.is_cuda:
+                                leaked.append(obj)
+                        except Exception:
+                            pass
+
+                    if leaked:
+                        print(f"⚠️  {len(leaked)} live CUDA tensor(s) still allocated:")
+                    else:
+                        print("✅  No live CUDA tensors found.")
 
                     for p in processes:
                         if p.is_alive():
@@ -551,6 +585,8 @@ def main_loop(args):
 
 
 if __name__ == '__main__':
+
+    mp.set_start_method('spawn', force=True)
 
     # Parse arguments from command line
 
