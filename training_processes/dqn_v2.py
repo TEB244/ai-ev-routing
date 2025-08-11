@@ -184,6 +184,11 @@ def train_dqn(queue,
     # Initialize simulation for the aggregation step
     environment.init_sim(aggregation_num)
     for i in range(num_episodes): # For each episode
+        if zone_index == 0:
+            episode_start_time = time.time()
+            last_time = episode_start_time
+            print(f"\n--- Episode {i} (Zone 0) on device {device} Timing ---")
+
         if save_offline_data:
             print(f'Here in line 186, saving offline data')
             trajectories.extend([
@@ -200,6 +205,11 @@ def train_dqn(queue,
                 }
                 for car_idx in range(num_cars)
             ])
+        
+        if zone_index == 0:
+            now = time.time()
+            print(f"Offline Data Trajectory Init: {now - last_time:.4f}s")
+            last_time = now
 
         distributions = torch.zeros((num_cars, max_timesteps, action_dim), dtype=dtype, device=device)
         actions = torch.zeros((num_cars, max_timesteps, action_dim), dtype=dtype, device=device)
@@ -207,10 +217,20 @@ def train_dqn(queue,
         rewards = torch.zeros((num_cars, max_timesteps), dtype=dtype, device=device)
         dones   = torch.zeros((num_cars, max_timesteps), dtype=dtype, device=device)
         
+        if zone_index == 0:
+            now = time.time()
+            print(f"Tensor Initialization: {now - last_time:.4f}s")
+            last_time = now
+        
         # Episode includes every car reaching their destination
         environment.reset_episode(chargers, routes, unique_chargers)  
         sim_done = False
         time_start_paths = time.time()
+
+        if zone_index == 0:
+            now = time.time()
+            print(f"Environment Episode Reset: {now - last_time:.4f}s")
+            last_time = now
 
         new_rewards = []
         list_rewards= []
@@ -317,27 +337,16 @@ def train_dqn(queue,
             if timestep_counter >= environment.max_steps:
                 raise Exception("MAX TIME-STEPS EXCEEDED!")
 
+        if zone_index == 0:
+            now = time.time()
+            print(f"Main Timestep Loop (Path Gen & Sim): {now - last_time:.4f}s")
+            last_time = now
+
         # Saving last state for next state
         for car_idx in range(num_cars): # For each car
             states[car_idx, timestep+1] = state  # Save state for each car on states
 
         ########### STORE EXPERIENCES ###########
-
-        # car_dones = [item for sublist in dones for item in sublist]
-        
-
-        # for d in range(len(actions)):
-
-        #     # buffers[d % num_cars].append(Experience(states[d], 
-        #     #                                         actions[d],\
-        #     #                                         rewards[d],
-        #     #                                         states[(d + num_cars) if d + num_cars < len(states) else d],
-        #     #                                         True if car_dones[d] == 1 else False))  # Store experience
-        #     print(f'line 341 d {d}')
-        #     action = actions[d]
-        #     next_state = states[d % num_cars]
-        #     car_done = True if dones[d % num_cars] == 1 else False
-        #     buffers[d % num_cars].add(state[d], action, rewards[d], next_state, car_done)
 
         for car_idx in range(num_cars):
             state_car  = states[car_idx,:timestep]
@@ -347,6 +356,10 @@ def train_dqn(queue,
             done_car   = dones[car_idx,:timestep]
             buffers[car_idx].add(state_car, action_car, reward_car, next_state, done_car, timestep)
         
+        if zone_index == 0:
+            now = time.time()
+            print(f"Store Experiences in Buffer: {now - last_time:.4f}s")
+            last_time = now
 
         st = time.time()
 
@@ -355,11 +368,6 @@ def train_dqn(queue,
         for agent_ind in range(num_cars):
             if len(buffers[agent_ind]) >= batch_size: # Buffer is full enough
                 trained = True
-
-                # mini_batch = None
-                # mini_batch = dqn_rng.choice(np.array([Experience(exp.state.cpu().numpy(), exp.distribution, exp.reward, exp.next_state.cpu().numpy(), exp.done) if isinstance(exp.state, torch.Tensor) else exp for exp in buffers[agent_ind]], dtype=object), batch_size, replace=False)
-                # experiences = map(np.stack, zip(*mini_batch))  # Format experiences
-
                 experiences = buffers[agent_ind].sample(batch_size, dqn_rng)
 
                 # Update networks
@@ -372,6 +380,11 @@ def train_dqn(queue,
         
         et = time.time() - st
 
+        if zone_index == 0:
+            now = time.time()
+            print(f"Agent Learning (Training): {now - last_time:.4f}s")
+            last_time = now
+
         if verbose and trained:
             to_print = f'Trained for {et:.3f}s'
             print_l(to_print)
@@ -383,6 +396,11 @@ def train_dqn(queue,
 
         avg_reward = episode_rewards.sum(axis=0).mean()
         avg_rewards.append((avg_reward, aggregation_num, zone_index, main_seed)) 
+
+        if zone_index == 0:
+            now = time.time()
+            print(f"Epsilon/Reward Update: {now - last_time:.4f}s")
+            last_time = now
 
         base_path = f'saved_networks/Experiment {experiment_number}'
 
@@ -402,9 +420,14 @@ def train_dqn(queue,
                     # Add this before you save your model
                     if not os.path.exists(base_path):
                         os.makedirs(base_path)
+        
+        if zone_index == 0:
+            now = time.time()
+            print(f"Target Network Update: {now - last_time:.4f}s")
+            last_time = now
 
         if save_offline_data and (i + 1) % eps_per_save == 0:
-            metrics_base_path = f"{eval_c['save_path_metrics'][arg.server]}_{experiment_number}"
+            metrics_base_path = f"{eval_c['save_path_metrics'][args.server]}_{experiment_number}"
             dataset_path = f"{metrics_base_path}/data_zone_{zone_index}.h5"
             checkpoint_dir = os.path.join(os.path.dirname(metrics_base_path),\
                                           f"temp/Exp_{experiment_number}_checkpoints")
@@ -433,26 +456,30 @@ def train_dqn(queue,
                 print_l(f"[ERROR] Failed to verify checkpoint (zone {zone_index}, episode {i + 1}): {e}")
                 os.remove(temp_path)
                 trajectories.clear()
-                continue
+                # continue # This would skip timing prints, so let's avoid it for now.
+            else:
+                # Append to main .h5 dataset incrementally
+                with h5py.File(dataset_path, 'a') as main_f, h5py.File(temp_path, 'r') as temp_f:
+                    main_zone_grp = main_f.require_group(f"zone_{zone_index}")
+                    temp_zone_grp = temp_f[f"zone_{zone_index}"]
+                    existing_keys = list(main_zone_grp.keys())
+                    offset = len(existing_keys)
+            
+                    for i_traj, traj_key in enumerate(temp_zone_grp):
+                        traj_data = temp_zone_grp[traj_key]
+                        new_grp = main_zone_grp.create_group(f"traj_{offset + i_traj}")
+                        for key in traj_data:
+                            new_grp.create_dataset(key, data=traj_data[key][:])
+                        for attr_key in traj_data.attrs:
+                            new_grp.attrs[attr_key] = traj_data.attrs[attr_key]
+            
+                os.remove(temp_path)
+                trajectories.clear()
 
-            # Append to main .h5 dataset incrementally
-            with h5py.File(dataset_path, 'a') as main_f, h5py.File(temp_path, 'r') as temp_f:
-                main_zone_grp = main_f.require_group(f"zone_{zone_index}")
-                temp_zone_grp = temp_f[f"zone_{zone_index}"]
-                existing_keys = list(main_zone_grp.keys())
-                offset = len(existing_keys)
-        
-                for i, traj_key in enumerate(temp_zone_grp):
-                    traj_data = temp_zone_grp[traj_key]
-                    new_grp = main_zone_grp.create_group(f"traj_{offset + i}")
-                    for key in traj_data:
-                        new_grp.create_dataset(key, data=traj_data[key][:])
-                    for attr_key in traj_data.attrs:
-                        new_grp.attrs[attr_key] = traj_data.attrs[attr_key]
-        
-            os.remove(temp_path)
-            trajectories.clear()
-
+        if zone_index == 0:
+            now = time.time()
+            print(f"Offline Data Saving (H5): {now - last_time:.4f}s")
+            last_time = now
         
         ### Saving metrics per episode ###
         station_data, agent_data = environment.get_data()
@@ -464,6 +491,11 @@ def train_dqn(queue,
         })
         station_data = None
         agent_data = None
+        
+        if zone_index == 0:
+            now = time.time()
+            print(f"Metrics Saving (CSV): {now - last_time:.4f}s")
+            last_time = now
         
         if avg_reward > best_avg:
             best_avg = avg_reward
@@ -488,6 +520,11 @@ def train_dqn(queue,
                         f"- Avg. Reward {round(float(avg_reward.cpu().numpy()), 3):0.3f} - Time-steps: {timestep_counter},"+\
                         f" Avg. IR: {round(avg_ir, 3):0.3f} - Epsilon: {round(epsilon, 3):0.3f}"
             print_l(to_print)
+
+        if zone_index == 0:
+            now = time.time()
+            print(f"End of Episode Misc & Logging: {now - last_time:.4f}s")
+            print(f"--- TOTAL EPISODE TIME: {now - episode_start_time:.4f}s ---")
 
     # np.save(f'outputs/best_paths/route_{zone_index}_seed_{seed}.npy', np.array(best_paths, dtype=object))
 
