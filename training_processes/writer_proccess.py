@@ -32,6 +32,26 @@ def multiprocess_writer(queue: mp.Queue, log_path: str, metrics_path: str, data_
                     os.fsync(file.fileno())        # flush OS buffer to disk
     
             print(text, flush=True)
+        
+        elif tag == "sustainability_episode":
+            sustainability_data = [{
+                "kwh": msg["kwh"],
+                "co2": msg["co2"],
+                "episode": msg["episode"],
+                "zone_index": msg["zone_index"],
+                "aggregation_step": msg["aggregation_step"]
+            }]
+
+            save_to_csv(sustainability_data, f'{metrics_path}/metrics_sustainability_episode.csv', True)
+
+        elif tag == "sustainability_aggregation":
+            sustainability_data = [{
+                "model_size_kb": msg["model_size_kb"],
+                "aggregation_step": msg["aggregation_step"]
+            }]
+
+            save_to_csv(sustainability_data, f'{metrics_path}/metrics_sustainability_aggregation.csv', True)
+
 
 def printer_queue(queue: mp.Queue):
     """

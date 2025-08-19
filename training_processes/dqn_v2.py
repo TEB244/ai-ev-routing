@@ -13,6 +13,8 @@ from environment._pathfinding import haversine
 from .odt.odt_helpers.utils import format_data, save_to_h5, save_temp_checkpoint
 from training_processes.writer_proccess import printer_queue
 
+from carbontracker.tracker import CarbonTracker
+
 def train_dqn(queue, 
               ev_info, 
               experiment_number, 
@@ -85,6 +87,10 @@ def train_dqn(queue,
     max_timesteps = environment.max_steps
     layers = nn_c['layers']
     aggregation_count = federated_c['aggregation_count'] if not args.eval else federated_c['aggregation_count_eval']
+
+    carbon_storage_dir = f'experiments/Exp_{experiment_number:04d}/{zone_index:02d}/{aggregation_num:02d}/'
+    tracker = CarbonTracker(epochs=num_episodes, epochs_before_pred=0, monitor_epochs=-1, update_interval=10,
+                            log_dir=carbon_storage_dir, verbose=True)
 
     target_network_update_frequency = nn_c['target_network_update_frequency'] if 'target_network_update_frequency' in nn_c else 25
 
@@ -184,6 +190,9 @@ def train_dqn(queue,
     # Initialize simulation for the aggregation step
     environment.init_sim(aggregation_num)
     for i in range(num_episodes): # For each episode
+
+        tracker.epoch_start() # Start tracking carbon emissions
+        
         if zone_index == 0:
             episode_start_time = time.time()
             last_time = episode_start_time
@@ -476,6 +485,7 @@ def train_dqn(queue,
                 os.remove(temp_path)
                 trajectories.clear()
 
+
         if zone_index == 0:
             now = time.time()
             print(f"Offline Data Saving (H5): {now - last_time:.4f}s")
@@ -526,7 +536,38 @@ def train_dqn(queue,
             print(f"End of Episode Misc & Logging: {now - last_time:.4f}s")
             print(f"--- TOTAL EPISODE TIME: {now - episode_start_time:.4f}s ---")
 
+        tracker.epoch_end() # End tracking carbon emissions
+
+        try:
+            # kWh used in each finished epoch; take the last one
+            epoch_kwh = float(tracker.tracker.total_energy_per_epoch()[-1])
+            # Average carbon intensity during this run (gCO2/kWh)
+            avg_ci = tracker.intensity_updater.average_carbon_intensity()
+            episode_co2_g = float(epoch_kwh * avg_ci.carbon_intensity)
+
+            queue.put({
+                'tag': 'sustainability_episode',
+                'kwh': epoch_kwh,              # kWh for this episode
+                'co2': episode_co2_g,          # grams CO2e for this episode
+                'episode': i,
+                'zone_index': zone_index,
+                'aggregation_step': aggregation_num
+            })
+        except Exception as e:
+            # If Carbontracker wasn’t able to read (e.g., permissions/NVML), push a minimal record
+            queue.put({
+                'tag': 'sustainability_episode',
+                'kwh': None,
+                'co2': None,
+                'error': f'carbontracker_read_failed: {e}',
+                'episode': i,
+                'zone_index': zone_index,
+                'aggregation_step': aggregation_num
+            })
+
     # np.save(f'outputs/best_paths/route_{zone_index}_seed_{seed}.npy', np.array(best_paths, dtype=object))
+
+    tracker.stop() # Stop tracking carbon emissions
 
     weights = [q_network.cpu().state_dict() for q_network in q_networks]
     del q_networks, target_q_networks, optimizers

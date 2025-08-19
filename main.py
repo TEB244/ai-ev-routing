@@ -6,7 +6,6 @@ import copy
 from datetime import datetime
 import numpy as np
 import torch
-# from codecarbon import EmissionsTracker
 import shutil
 import pandas as pd
 import cProfile
@@ -129,11 +128,6 @@ def main_loop(args):
     if os.path.exists(metrics_with_sub_dir):
         shutil.rmtree(metrics_with_sub_dir)
     os.makedirs(metrics_with_sub_dir)
-
-    # Carbon emissions directory and path
-    emission_output_dir = metrics_base_path + sub_dir
-    if not os.path.exists(emission_output_dir):
-        os.makedirs(emission_output_dir)
 
 
     if algorithm_dm in ["DQN", "PPO", "DDPG", "REINFORCE", "ODT"]: # reinforcement learning
@@ -344,6 +338,23 @@ def main_loop(args):
 
                 print("Join Weights")
 
+                total_model_size_kb = 0
+
+                for i, weight_group in enumerate(local_weights_list):
+                    if weight_group is not None:
+                        for state_dict in weight_group:   # loop inside the inner list
+                            model_size = sum(
+                                p.numel() * p.element_size()
+                                for p in state_dict.values()
+                            )
+                            total_model_size_kb += model_size
+                        
+                queue.put({
+                    'tag': 'sustainability_aggregation',
+                    'model_size_kb': total_model_size_kb / 1024,
+                    'aggregation_step': aggregate_step
+                })
+
                 # Aggregate the weights from all local models
                 if algorithm_dm == 'ODT':
                     global_weights = get_global_weights(local_weights_list, ev_info,\
@@ -517,6 +528,20 @@ def main_loop(args):
                 rewards = []
 
                 print("Join Weights")
+
+                total_model_size_kb = 0
+                # Track data size of local weights and store it in metrics_base_path
+                for i, local_weights in enumerate(local_weights_list):
+                    if local_weights is not None:
+                        data_size = local_weights.numel() * local_weights.element_size()
+                        total_model_size_kb += data_size
+                        
+                queue.put({
+                    'tag': 'sustainability_aggregation',
+                    'model_size_kb': total_model_size_kb / 1024,
+                    'aggregation_step': aggregate_step
+                })
+
 
                 # Aggregate the attention layers from all local agents
                 if algorithm_dm == 'ODT':
