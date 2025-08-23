@@ -567,7 +567,7 @@ class EnvironmentClass:
         #get rewards for episode
         rewards = self.get_rewards(population_mode=population_mode)
         
-        return done, rewards.cpu(), self.timestep, self.arrived_at_final
+        return done, rewards.cpu(), self.arrived_at_final
 
     def get_odt_info(self):
         return self.arrived_at_final

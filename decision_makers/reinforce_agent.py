@@ -66,7 +66,7 @@ def compute_loss(experiences, gamma, policy_network):
         torch.tensor: The computed policy gradient loss value.
     """
 
-    states, actions, rewards, _, dones = experiences
+    states, actions, rewards, dones = experiences
 
     # Compute discounted returns for each time step
     returns = []
@@ -110,14 +110,7 @@ def agent_learn(experiences, gamma, policy_network, optimizer, device):
         None
     """
 
-    states, actions, rewards, next_states, dones = experiences
-    states = torch.tensor(states, dtype=torch.float32, device=device)
-    actions = torch.tensor(actions, dtype=torch.float32, device=device)
-    rewards = torch.tensor(rewards, dtype=torch.float32, device=device)
-    dones = torch.tensor(dones, dtype=torch.float32, device=device)
-
-    experiences_torch = (states, actions, rewards, next_states, dones)
-    loss = compute_loss(experiences_torch, gamma, policy_network)
+    loss = compute_loss(experiences, gamma, policy_network)
 
     optimizer.zero_grad()
     loss.backward()
@@ -125,7 +118,7 @@ def agent_learn(experiences, gamma, policy_network, optimizer, device):
     torch.nn.utils.clip_grad_norm_(policy_network.parameters(), max_norm=1.0)
     optimizer.step()
 
-def get_actions(state, policy_networks, episode_index, agent_index, device, epsilon):
+def get_actions(state, policy_networks, episode_index, agent_index, device, epsilon, random_threshold, nn_by_zone):
     """
     Selects actions for an agent using a mixture of distribution sampling and greedy approach
     (based on an epsilon threshold).
@@ -137,18 +130,21 @@ def get_actions(state, policy_networks, episode_index, agent_index, device, epsi
         agent_index (int): Index of the current agent.
         device (torch.device): The device on which the policy network runs.
         epsilon (float): Exploration rate for action selection.
+        random_threshold (numpy.array): Array of random thresholds for epsilon-greedy action selection.
 
     Returns:
         torch.tensor: The probabilities for all actions.
     """
 
-    random_number = np.random.rand()
-    if random_number < epsilon:
+    if random_threshold[episode_index, agent_index] < epsilon:
         with torch.no_grad():
             output_size = policy_networks[0](state).size(0)
         probs = torch.tensor(np.random.rand(output_size), device=device)
     else:
-        probs = policy_networks[0](state)
+        if nn_by_zone:
+            probs = policy_networks[0](state)
+        else:
+            probs = policy_networks[agent_index](state)  # Greedy action
         
     return probs.detach()
 

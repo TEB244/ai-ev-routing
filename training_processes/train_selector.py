@@ -52,7 +52,7 @@ def train_route(queue, ev_info, experiment_number, chargers, environment, routes
             from training_processes.odt.train_odt import train_odt as train
 
         elif algorithm_dm == 'REINFORCE':
-            from training_processes.reinforce import train_reinforce as train
+            from training_processes.reinforce_v2 import train_reinforce as train
         
         elif algorithm_dm == 'CMA':
             from training_processes.cma import train_cma as train

@@ -88,9 +88,7 @@ def train_dqn(queue,
     layers = nn_c['layers']
     aggregation_count = federated_c['aggregation_count'] if not args.eval else federated_c['aggregation_count_eval']
 
-    carbon_storage_dir = f'experiments/Exp_{experiment_number:04d}/{zone_index:02d}/{aggregation_num:02d}/'
-    tracker = CarbonTracker(epochs=num_episodes, epochs_before_pred=0, monitor_epochs=-1, update_interval=10,
-                            log_dir=carbon_storage_dir, verbose=True)
+    tracker = CarbonTracker(epochs=num_episodes, epochs_before_pred=0, monitor_epochs=-1, update_interval=10, verbose=False)
 
     target_network_update_frequency = nn_c['target_network_update_frequency'] if 'target_network_update_frequency' in nn_c else 25
 
@@ -118,7 +116,6 @@ def train_dqn(queue,
     unique_chargers = np.unique(np.array(list(map(tuple, chargers.reshape(-1, 3))), dtype=[('id', int), ('lat', float), ('lon', float)]))
 
     state_dimension = (environment.num_chargers * 3 * 2) + 6
-
     model_indices = environment.info['model_indices']
     
     q_networks = []
@@ -171,9 +168,6 @@ def train_dqn(queue,
             target_q_networks.append(target_q_network)
             optimizers.append(optimizer)
 
-    random_threshold = dqn_rng.random((num_episodes, num_cars))
-
-
     buffers = [
         ExperienceBuffer(buffer_limit, state_dimension, action_dim, device=device) for _ in range(num_cars)]
 
@@ -191,15 +185,11 @@ def train_dqn(queue,
     environment.init_sim(aggregation_num)
     for i in range(num_episodes): # For each episode
 
+        random_threshold = dqn_rng.random((num_episodes, num_cars))
+
         tracker.epoch_start() # Start tracking carbon emissions
-        
-        if zone_index == 0:
-            episode_start_time = time.time()
-            last_time = episode_start_time
-            print(f"\n--- Episode {i} (Zone 0) on device {device} Timing ---")
 
         if save_offline_data:
-            print(f'Here in line 186, saving offline data')
             trajectories.extend([
                 {
                     'observations': [],
@@ -225,11 +215,6 @@ def train_dqn(queue,
         states  = torch.zeros((num_cars, max_timesteps+1, state_dimension), dtype=dtype, device=device)
         rewards = torch.zeros((num_cars, max_timesteps), dtype=dtype, device=device)
         dones   = torch.zeros((num_cars, max_timesteps), dtype=dtype, device=device)
-        
-        if zone_index == 0:
-            now = time.time()
-            print(f"Tensor Initialization: {now - last_time:.4f}s")
-            last_time = now
         
         # Episode includes every car reaching their destination
         environment.reset_episode(chargers, routes, unique_chargers)  
@@ -266,8 +251,7 @@ def train_dqn(queue,
                 ####### Getting actions from agents
                 
                 # Get the action values from the agent
-                action_values = get_actions(state, q_networks, random_threshold, epsilon, i,\
-                                            car_idx, device, agent_by_zone)  
+                action_values = get_actions(state, q_networks, random_threshold, epsilon, i, car_idx, device, agent_by_zone)
 
                 t2 = time.time()
                 if save_offline_data:
@@ -312,7 +296,7 @@ def train_dqn(queue,
             ########### GET SIMULATION RESULTS ###########
 
             # Run simulation and get results
-            sim_done, timestep_reward, timestep_counter, arrived_at_final = environment.simulate_routes()
+            sim_done, timestep_reward, arrived_at_final = environment.simulate_routes()
 
             dones[:,timestep] = arrived_at_final
 
@@ -330,8 +314,6 @@ def train_dqn(queue,
             else:
                 rewards[:,timestep] = timestep_reward
 
-            time_step_time = time.time() - start_time_step
-
             if save_offline_data:
                 arrived = environment.get_odt_info()
                 for traj in trajectories:
@@ -341,9 +323,7 @@ def train_dqn(queue,
                         traj['rewards'].append(episode_rewards[-1,car_idx])
                         traj['terminals_car'].append(bool(arrived[car_idx].item()))                
 
-            time_step_time = time.time() - start_time_step
-
-            if timestep_counter >= environment.max_steps:
+            if timestep >= environment.max_steps:
                 raise Exception("MAX TIME-STEPS EXCEEDED!")
 
         if zone_index == 0:
@@ -527,7 +507,7 @@ def train_dqn(queue,
             to_print =  f"(Agg.: {aggregation_num + 1} - Zone: {zone_index + 1}"+\
                         f" - Episode: {i + 1}/{num_episodes})\t"+\
                         f" et: {int(et // 3600):02d}h{int((et % 3600) // 60):02d}m{int(et % 60):02d}s"+\
-                        f"- Avg. Reward {round(float(avg_reward.cpu().numpy()), 3):0.3f} - Time-steps: {timestep_counter},"+\
+                        f"- Avg. Reward {round(float(avg_reward.cpu().numpy()), 3):0.3f} - Time-steps: {timestep},"+\
                         f" Avg. IR: {round(avg_ir, 3):0.3f} - Epsilon: {round(epsilon, 3):0.3f}"
             print_l(to_print)
 
