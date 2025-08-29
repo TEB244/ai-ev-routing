@@ -236,6 +236,7 @@ class EnvironmentClass:
         # Seeding environment random generator
         rng = np.random.default_rng(sub_seed)
 
+
         self.temperature = get_temperature(server, config['season'], config['coords'][zone], rng, seed)
 
         self.init_ev_info(config, self.temperature, rng)
@@ -787,7 +788,7 @@ class EnvironmentClass:
         if DEBUG:
             print(f"{agent_index} - PATH - {path}")
 
-        self.local_paths.append(copy.deepcopy(path))
+        self.local_paths[agent_index] = copy.deepcopy(path)
 
         # Get stop ids from global list instead of only local to agent
         stop_ids = np.array([self.agent.unique_traffic[step, 0] for step in path])
@@ -798,7 +799,7 @@ class EnvironmentClass:
         # Create global_paths by preserving the order from the original path
         global_paths = np.array([traffic_dict[stop_id] for stop_id in stop_ids if stop_id in traffic_dict])
 
-        self.paths.append(global_paths)
+        self.paths[agent_index] = global_paths
 
         # Update traffic
         for step in global_paths:
@@ -867,10 +868,10 @@ class EnvironmentClass:
 
     def init_routing(self):
         # Clearing paths
-        self.paths = []
+        self.paths = [[] for _ in range(self.num_cars)]
         self.historical_charges_needed.append(self.charges_needed)
         self.charges_needed = []
-        self.local_paths = []
+        self.local_paths = [[] for _ in range(self.num_cars)]
 
         self.timestep += 1
         if self.timestep > self.max_steps:
@@ -914,10 +915,10 @@ class EnvironmentClass:
             routes (np.ndarray): Array of routes.
             unique_chargers (np.ndarray): Array of unique chargers.
         """
-        self.paths = []
+        self.paths = [[] for _ in range(self.num_cars)]
         self.charges_needed = []
         self.historical_charges_needed = []
-        self.local_paths = []
+        self.local_paths = [[] for _ in range(self.num_cars)]
         self.tokens = None
         self.distances_episode = np.zeros(self.num_cars)
         self.energy_episode = []
@@ -968,7 +969,7 @@ class EnvironmentClass:
         
         self.store_paths = []
         self.store_charges_needed = []
-        self.store_local_paths = []
+        self.store_local_paths = [[] for _ in range(self.num_cars)]
 
 
 # if __name__ == "__main__":

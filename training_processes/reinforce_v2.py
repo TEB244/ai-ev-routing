@@ -74,6 +74,9 @@ def train_reinforce(queue,
     nn_c = load_config_file(config_fname)['nn_hyperparameters']
     eval_c = load_config_file(config_fname)['eval_config']
     federated_c = load_config_file(config_fname)['federated_learning_settings']
+    environment_c = load_config_file(config_fname)['environment_settings']
+
+    start_sequence = environment_c.get('start_sequence', 'static')
 
     # For policy gradient, discount factor might still be used in returns
     discount_factor = nn_c['discount_factor'] if 'discount_factor' in nn_c else 0.99
@@ -199,8 +202,15 @@ def train_reinforce(queue,
             timestep = environment.init_routing()
             start_time_step = time.time()
 
+            if start_sequence == 'random':
+                starting_number = rng.integers(0, num_cars)
+            else:
+                starting_number = 0
+
             # Sample actions for each EV
             for car_idx in range(num_cars):
+                car_idx = (starting_number + car_idx) % num_cars
+
                 if save_offline_data:
                     car_traj = next((t for t in trajectories if (
                         t['car_idx'] == car_idx and t['zone'] == zone_index and

@@ -76,6 +76,9 @@ def train_dqn(queue,
     nn_c = load_config_file(config_fname)['nn_hyperparameters']
     eval_c = load_config_file(config_fname)['eval_config']
     federated_c = load_config_file(config_fname)['federated_learning_settings']
+    environment_c = load_config_file(config_fname)['environment_settings']
+
+    start_sequence = environment_c.get('start_sequence', 'static')
 
     epsilon = nn_c['epsilon']
 
@@ -233,8 +236,15 @@ def train_dqn(queue,
             timestep = environment.init_routing()
             start_time_step = time.time()
 
+            if start_sequence == 'random':
+                starting_number = dqn_rng.integers(0, num_cars)
+            else:
+                starting_number = 0
+
             # Build path for each EV
             for car_idx in range(num_cars): # For each car
+                car_idx = (starting_number + car_idx) % num_cars
+
                 if save_offline_data:
                     # Retrieve car trajectory
                     car_traj = next((t for t in trajectories if (

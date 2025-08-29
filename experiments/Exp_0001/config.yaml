@@ -40,6 +40,7 @@ environment_settings:
   - 9840
   - 8460
   - 9360
+  start_sequence: 'random' # 'random' or 'static'
 eval_config:
   continue_training: false
   display_training_times: false
