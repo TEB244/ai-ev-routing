@@ -13,6 +13,7 @@ environment_settings:
     - -81.28349087468504
   - - 42.9819404397449
     - -81.2508736429095
+  ev_rationality: 0.9
   increase_rate: 12500
   max_charge:
   - 170000
@@ -30,8 +31,10 @@ environment_settings:
   saving_data_deepness: episode_level
   season: winter
   seed: 1234
+  start_sequence: random
   starting_charge: 6000
   step_size: 0.03
+  traffic_noise: 3
   usage_per_hour:
   - 9840
   - 8460
