@@ -127,6 +127,10 @@ def train_dqn(queue,
 
     num_cars = environment.num_cars
 
+    track_times = False
+    last_time = time.time()
+    episode_start_time = time.time()
+
     # Calling log and console printer standardized
     print_l, print_et = printer_queue(queue)
     
@@ -207,11 +211,7 @@ def train_dqn(queue,
                 }
                 for car_idx in range(num_cars)
             ])
-        
-        if zone_index == 0:
-            now = time.time()
-            print(f"Offline Data Trajectory Init: {now - last_time:.4f}s")
-            last_time = now
+    
 
         distributions = torch.zeros((num_cars, max_timesteps, action_dim), dtype=dtype, device=device)
         actions = torch.zeros((num_cars, max_timesteps, action_dim), dtype=dtype, device=device)
@@ -224,9 +224,10 @@ def train_dqn(queue,
         sim_done = False
         time_start_paths = time.time()
 
-        if zone_index == 0:
+        if zone_index == 0 and track_times:
             now = time.time()
-            print(f"Environment Episode Reset: {now - last_time:.4f}s")
+            if last_time is not None:
+                print(f"Environment Episode Reset: {now - last_time:.4f}s")
             last_time = now
 
         new_rewards = []
@@ -336,9 +337,10 @@ def train_dqn(queue,
             if timestep >= environment.max_steps:
                 raise Exception("MAX TIME-STEPS EXCEEDED!")
 
-        if zone_index == 0:
+        if zone_index == 0 and track_times:
             now = time.time()
-            print(f"Main Timestep Loop (Path Gen & Sim): {now - last_time:.4f}s")
+            if last_time is not None:
+                print(f"Main Timestep Loop (Path Gen & Sim): {now - last_time:.4f}s")
             last_time = now
 
         # Saving last state for next state
@@ -355,9 +357,10 @@ def train_dqn(queue,
             done_car   = dones[car_idx,:timestep]
             buffers[car_idx].add(state_car, action_car, reward_car, next_state, done_car, timestep)
         
-        if zone_index == 0:
+        if zone_index == 0 and track_times:
             now = time.time()
-            print(f"Store Experiences in Buffer: {now - last_time:.4f}s")
+            if last_time is not None:
+                print(f"Store Experiences in Buffer: {now - last_time:.4f}s")
             last_time = now
 
         st = time.time()
@@ -379,9 +382,10 @@ def train_dqn(queue,
         
         et = time.time() - st
 
-        if zone_index == 0:
+        if zone_index == 0 and track_times:
             now = time.time()
-            print(f"Agent Learning (Training): {now - last_time:.4f}s")
+            if last_time is not None:
+                print(f"Agent Learning (Training): {now - last_time:.4f}s")
             last_time = now
 
         if verbose and trained:
@@ -396,9 +400,10 @@ def train_dqn(queue,
         avg_reward = episode_rewards.sum(axis=0).mean()
         avg_rewards.append((avg_reward, aggregation_num, zone_index, main_seed)) 
 
-        if zone_index == 0:
+        if zone_index == 0 and track_times:
             now = time.time()
-            print(f"Epsilon/Reward Update: {now - last_time:.4f}s")
+            if last_time is not None:
+                print(f"Epsilon/Reward Update: {now - last_time:.4f}s")
             last_time = now
 
         base_path = f'saved_networks/Experiment {experiment_number}'
@@ -420,9 +425,10 @@ def train_dqn(queue,
                     if not os.path.exists(base_path):
                         os.makedirs(base_path)
         
-        if zone_index == 0:
+        if zone_index == 0 and track_times:
             now = time.time()
-            print(f"Target Network Update: {now - last_time:.4f}s")
+            if last_time is not None:
+                print(f"Target Network Update: {now - last_time:.4f}s")
             last_time = now
 
         if save_offline_data and (i + 1) % eps_per_save == 0:
@@ -476,9 +482,10 @@ def train_dqn(queue,
                 trajectories.clear()
 
 
-        if zone_index == 0:
+        if zone_index == 0 and track_times:
             now = time.time()
-            print(f"Offline Data Saving (H5): {now - last_time:.4f}s")
+            if last_time is not None:
+                print(f"Offline Data Saving (H5): {now - last_time:.4f}s")
             last_time = now
         
         ### Saving metrics per episode ###
@@ -492,9 +499,10 @@ def train_dqn(queue,
         station_data = None
         agent_data = None
         
-        if zone_index == 0:
+        if zone_index == 0 and track_times:
             now = time.time()
-            print(f"Metrics Saving (CSV): {now - last_time:.4f}s")
+            if last_time is not None:
+                print(f"Metrics Saving (CSV): {now - last_time:.4f}s")
             last_time = now
         
         if avg_reward > best_avg:
@@ -521,9 +529,10 @@ def train_dqn(queue,
                         f" Avg. IR: {round(avg_ir, 3):0.3f} - Epsilon: {round(epsilon, 3):0.3f}"
             print_l(to_print)
 
-        if zone_index == 0:
+        if zone_index == 0 and track_times:
             now = time.time()
-            print(f"End of Episode Misc & Logging: {now - last_time:.4f}s")
+            if last_time is not None:
+                print(f"End of Episode Misc & Logging: {now - last_time:.4f}s")
             print(f"--- TOTAL EPISODE TIME: {now - episode_start_time:.4f}s ---")
 
         tracker.epoch_end() # End tracking carbon emissions

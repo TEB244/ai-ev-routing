@@ -41,6 +41,8 @@ environment_settings:
   - 8460
   - 9360
   start_sequence: 'random' # 'random' or 'static'
+  traffic_noise: 3 # traffic += int(noise * random number between 0 and 1)
+  ev_rationality: 0.9 # % chance EV will do what it's told
 eval_config:
   continue_training: false
   display_training_times: false

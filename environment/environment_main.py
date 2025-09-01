@@ -236,6 +236,10 @@ class EnvironmentClass:
         # Seeding environment random generator
         rng = np.random.default_rng(sub_seed)
 
+        self.traffic_noise = config.get('traffic_noise', 0)
+        self.ev_rationality = config.get('ev_rationality', 1)
+
+        self.seed = sub_seed
 
         self.temperature = get_temperature(server, config['season'], config['coords'][zone], rng, seed)
 
@@ -473,7 +477,7 @@ class EnvironmentClass:
             arrived = get_arrived(distances, self.step_size)
 
             # Accumulate traffic level of each station as Mx1 matrix
-            traffic_level = get_traffic(stops, destinations, arrived)
+            traffic_level = get_traffic(stops, destinations, arrived, self.traffic_noise, self.seed)
 
             # Track traffic for each timestep
             traffic_per_charger = torch.cat([traffic_per_charger, traffic_level.unsqueeze(0)], dim=0)
@@ -494,7 +498,7 @@ class EnvironmentClass:
             energy_used += torch.abs(charging_rates)
 
             # Check if the car is at their target battery level
-            battery_charged = get_battery_charged(battery, target_battery_level, self.device)
+            battery_charged = get_battery_charged(battery, target_battery_level, self.device, self.ev_rationality, self.seed)
 
             # Charging but ready to leave
             ready_to_leave = battery_charged * arrived

@@ -1,6 +1,5 @@
 import os
 import argparse
-import warnings
 import time
 import copy
 from datetime import datetime
@@ -10,8 +9,10 @@ import shutil
 import pandas as pd
 import cProfile
 from collections import defaultdict
-import torch
+
+import warnings
 warnings.filterwarnings("ignore")
+
 import gc
 import tracemalloc
 tracemalloc.start()

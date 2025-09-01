@@ -72,7 +72,7 @@ def get_arrived(dists, dist_threshold):
     # Return 1 if below threshold, and 0 if above
     return (dists <= dist_threshold).int()
 
-def get_traffic(stops, destinations, is_charging):
+def get_traffic(stops, destinations, is_charging, traffic_noise, seed):
     """
     Calculates the traffic level at each charging station based on the stops and charging status of vehicles.
 
@@ -80,10 +80,13 @@ def get_traffic(stops, destinations, is_charging):
         stops (torch.Tensor): A tensor containing the stops for each vehicle.
         destinations (torch.Tensor): A tensor containing the coordinates of possible destinations.
         is_charging (torch.Tensor): A tensor indicating whether each vehicle is charging (1) or not (0).
-
+        traffic_noise (float): The noise level for the traffic.
+        seed (int): The seed for the random number generator.
     Returns:
         torch.Tensor: A tensor containing the traffic level at each charging station.
     """
+
+    torch.manual_seed(seed)
 
     # Get stations to charge at
     target_stations = stops[:, 0].reshape(-1)
@@ -97,8 +100,11 @@ def get_traffic(stops, destinations, is_charging):
     # Used to find end of the list
     max_num = destinations.shape[0]
 
-    # I don't really know how this works, but it does
+    # Get the traffic level at each charging station
     traffic_level = torch.bincount(stations_in_use, minlength=max_num)
+
+    # Add noise to the traffic level
+    traffic_level = traffic_level + torch.round(torch.randn(traffic_level.shape, device=traffic_level.device) * traffic_noise)
 
     # Ignore destination 0 if it's not a valid station ID
     if max_num > 0:
@@ -186,7 +192,7 @@ def update_battery(battery, charge_rate, arrived_at_final):
     return battery + (charge_rate * mask.squeeze(0))
 
 
-def get_battery_charged(battery, target, device):
+def get_battery_charged(battery, target, device, ev_rationality, seed):
     """
     Determines whether each vehicle's battery level is sufficient to depart from the charging station.
 
@@ -194,15 +200,23 @@ def get_battery_charged(battery, target, device):
         battery (torch.Tensor): A tensor containing the current battery levels.
         target (torch.Tensor): A tensor containing the target battery levels required.
         device (torch.device): Target device (used for error printing).
-
+        ev_rationality (float): The rationality of the EV.
+        seed (int): The seed for the random number generator.
     Returns:
         torch.Tensor: A tensor containing 1s and 0s where 1 indicates battery is sufficient, 0 otherwise.
     """
 
     # Return if the battery level is above the needed level to depart from charging station
     try:
+
+        torch.manual_seed(seed)
+
+        # Get random numbers between 0 and 1
+        random_nums = torch.rand(battery.shape, device=device)
+        # If random number is greater than ev_rationality, the EV will keep charging
+        irrational_check = random_nums < ev_rationality    
         # Compare battery level with the target for the *current* stop (index 0 after updates)
-        return (battery >= target[:, 0]).int()
+        return (battery >= target[:, 0]).int() * irrational_check.int()
     except Exception as e:
         print(f"Error in get_battery_charged on device {device}: {e}")
         # It might be helpful to print shapes and dtypes here for debugging
