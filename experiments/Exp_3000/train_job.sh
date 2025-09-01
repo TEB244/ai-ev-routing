@@ -17,4 +17,4 @@ source ~/envs/merl_env/bin/activate
 # Enable multi-threading
 export OMP_NUM_THREADS=2
 
-python app_v2.py -g 0 1 2 3 -e 3000 -d "/home/epigou/scratch/metrics/Exp"
+python main.py -g 0 1 2 3 -e 3000 -d "/home/epigou/scratch/metrics/Exp"

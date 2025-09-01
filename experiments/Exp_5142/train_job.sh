@@ -28,4 +28,4 @@ export CUDA_MPS_LOG_DIRECTORY=/tmp/nvidia-log
 nvidia-cuda-mps-control -d
 
 
-python app_v2.py -g 0 -e 5142 -d "/home/epigou/scratch/metrics/Exp"
+python main.py -g 0 -e 5142 -d "/home/epigou/scratch/metrics/Exp"
