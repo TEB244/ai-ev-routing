@@ -4,7 +4,7 @@
 #SBATCH --error=experiments/Exp_0145/error.log
 #SBATCH -A rrg-kgroling
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=4
+#SBATCH --cpus-per-task=6
 #SBATCH --gpus-per-node=2
 #SBATCH --time=00:01:21
 #SBATCH --mem=64G

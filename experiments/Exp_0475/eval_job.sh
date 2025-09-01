@@ -6,7 +6,7 @@
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=6
 #SBATCH --time=16:00:00
-#SBATCH --mem=16G
+#SBATCH --mem=6G
 
 
 echo "Starting evaluation for experiment 0475"
