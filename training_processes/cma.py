@@ -14,6 +14,7 @@ from training_processes.writer_proccess import printer_queue
 
 
 def train_cma(queue,
+              data_dir,
               ev_info, 
               experiment_number,
               chargers, environment,

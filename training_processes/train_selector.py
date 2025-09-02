@@ -3,7 +3,7 @@ import time
 import sys
 import torch
 
-def train_route(queue, ev_info, experiment_number, chargers, environment, routes, date, action_dim, global_weights,
+def train_route(queue, data_dir, ev_info, experiment_number, chargers, environment, routes, date, action_dim, global_weights,
                 aggregate_step, ind, algorithm_dm, sub_seed, main_seed, args, fixed_attributes, local_weights_list,
                 rewards, output_values, barrier, device, verbose, display_training_times, agent_by_zone, variant,
                 save_offline_data, train_model, old_buffers, process_buffers, weights_to_save, num_zones):
@@ -61,7 +61,7 @@ def train_route(queue, ev_info, experiment_number, chargers, environment, routes
             raise RuntimeError(f'model {algorithm_dm} algorithm not found.')
 
         local_weights_per_agent, avg_rewards, avg_output_values, new_buffers =\
-            train(queue, ev_info, experiment_number, chargers_copy, environment, routes, \
+            train(queue, data_dir, ev_info, experiment_number, chargers_copy, environment, routes, \
                   date, action_dim, global_weights, aggregate_step, ind, sub_seed, main_seed, str(device), \
                   agent_by_zone, variant, args, fixed_attributes, verbose, display_training_times, torch.float32, \
                   save_offline_data, train_model, old_buffers)

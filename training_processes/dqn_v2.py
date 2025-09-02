@@ -16,6 +16,7 @@ from training_processes.writer_proccess import printer_queue
 from carbontracker.tracker import CarbonTracker
 
 def train_dqn(queue, 
+              data_dir,
               ev_info, 
               experiment_number, 
               chargers, environment, 
@@ -91,7 +92,7 @@ def train_dqn(queue,
     layers = nn_c['layers']
     aggregation_count = federated_c['aggregation_count'] if not args.eval else federated_c['aggregation_count_eval']
 
-    tracker = CarbonTracker(epochs=num_episodes, epochs_before_pred=0, monitor_epochs=-1, update_interval=10, verbose=False)
+    tracker = CarbonTracker(epochs=num_episodes, epochs_before_pred=0, monitor_epochs=-1, update_interval=1, verbose=0, ignore_errors=True)
 
     target_network_update_frequency = nn_c['target_network_update_frequency'] if 'target_network_update_frequency' in nn_c else 25
 
@@ -432,7 +433,7 @@ def train_dqn(queue,
             last_time = now
 
         if save_offline_data and (i + 1) % eps_per_save == 0:
-            metrics_base_path = f"{eval_c['save_path_metrics'][args.server]}_{experiment_number}"
+            metrics_base_path = f"{data_dir}_{experiment_number}"
             dataset_path = f"{metrics_base_path}/data_zone_{zone_index}.h5"
             checkpoint_dir = os.path.join(os.path.dirname(metrics_base_path),\
                                           f"temp/Exp_{experiment_number}_checkpoints")
