@@ -19,8 +19,11 @@ from .odt_helpers.trainer import SequenceTrainer
 from .odt_helpers.logger import Logger
 from .odt_helpers.online_data import PersistentOnlineDataset, create_online_dataloader
 
+from carbontracker.tracker import CarbonTracker
+
 class Experiment:
     def __init__(self, params):
+        self.queue               = params['queue']
         self.ev_info             = params['ev_info']
         self.metrics_base_path   = params['metrics_base_path']
         self.experiment_number   = params['experiment_number']
@@ -185,8 +188,10 @@ class Experiment:
 
         offline_iter = 0
         print("\n\n\n*** Offline Training ***")
+        self.tracker = CarbonTracker(epochs=(self.odt_config["max_offline_iters"] + self.odt_config["max_online_iters"]), epochs_before_pred=0, monitor_epochs=-1, update_interval=1, verbose=0, ignore_errors=True)
         eval_fns = [
             create_vec_eval_episodes_fn(
+                queue=self.queue,
                 vec_env=self.environment,
                 eval_rtg=self.odt_config["eval_rtg"],
                 state_dim=self.environment.state_dim,
@@ -219,6 +224,7 @@ class Experiment:
             SummaryWriter(self.logger.log_path)
         )
         while offline_iter < self.odt_config["max_offline_iters"]:
+            self.tracker.epoch_start() # Start tracking carbon emissions
             self.environment.init_sim(self.aggregation_num)
             dataloader = create_dataloader(
                 trajectories=trajectories,
@@ -237,7 +243,7 @@ class Experiment:
                 loss_fn=self.loss_fn,
                 dataloader=dataloader,
             )
-            eval_outputs, eval_reward = utils.evaluateODT(eval_fns, self.ODTAgent)
+            eval_outputs, _ = utils.evaluateODT(eval_fns, self.ODTAgent)
             outputs = {"time/total": time.time() - self.start_time}
             outputs.update(train_outputs)
             outputs.update(eval_outputs)
@@ -250,6 +256,33 @@ class Experiment:
             self.ODTAgent._save_weights(self.logger.log_path, is_offline_model=True)
 
             offline_iter += 1
+            self.tracker.epoch_end()
+            try:
+                # kWh used in each finished epoch; take the last one
+                epoch_kwh = float(self.tracker.tracker.total_energy_per_epoch()[-1])
+                # Average carbon intensity during this run (gCO2/kWh)
+                avg_ci = self.tracker.intensity_updater.average_carbon_intensity()
+                episode_co2_g = float(epoch_kwh * avg_ci.carbon_intensity)
+
+                self.queue.put({
+                    'tag': 'sustainability_episode',
+                    'kwh': epoch_kwh,              # kWh for this episode
+                    'co2': episode_co2_g,          # grams CO2e for this episode
+                    'episode': offline_iter,
+                    'zone_index': self.zone_index,
+                    'aggregation_step': self.aggregation_num
+                })
+            except Exception as e:
+                # If Carbontracker wasn’t able to read (e.g., permissions/NVML), push a minimal record
+                self.queue.put({
+                    'tag': 'sustainability_episode',
+                    'kwh': None,
+                    'co2': None,
+                    'error': f'carbontracker_read_failed: {e}',
+                    'episode': offline_iter,
+                    'zone_index': self.zone_index,
+                    'aggregation_step': self.aggregation_num
+                })
         
         return trajectories, state_mean, state_std
         
@@ -261,6 +294,11 @@ class Experiment:
         
         #Create replay buffer from trajectories:
         replay_buffer = ReplayBuffer(self.odt_config['replay_size'], trajectories)
+
+        #Tracker for consecutive aggregations
+        if self.aggregation_num > 0:
+            self.odt_config["max_offline_iters"] = 0 #For logging purposes
+            self.tracker = CarbonTracker(epochs=self.odt_config["max_online_iters"], epochs_before_pred=0, monitor_epochs=-1, update_interval=1, verbose=0, ignore_errors=True)
         
         #Builds persistent online dataset/replay buffer only updated with online experiences
         transform = TransformSamplingSubTraj(
@@ -286,6 +324,7 @@ class Experiment:
         )
         eval_fns = [
             create_vec_eval_episodes_fn(
+                queue=self.queue,
                 vec_env=self.environment,
                 eval_rtg=self.odt_config["eval_rtg"],
                 state_dim=self.environment.state_dim,
@@ -310,6 +349,7 @@ class Experiment:
         )
 
         while online_iter < self.odt_config["max_online_iters"]:
+            self.tracker.epoch_start()
             online_dataloader = create_online_dataloader(
                 online_dataset,
                 batch_size=self.odt_config['batch_size']
@@ -319,6 +359,7 @@ class Experiment:
             with torch.no_grad(): 
                 target_return = [self.odt_config["online_rtg"] * self.reward_scale]
                 returns, lengths, trajs = vec_evaluate_episode_rtg(
+                    self.queue,
                     self.environment,
                     self.chargers,
                     self.routes,
@@ -362,7 +403,7 @@ class Experiment:
             outputs.update(train_outputs)
     
             if evalODT:
-                eval_outputs, eval_reward = utils.evaluateODT(eval_fns, self.ODTAgent)
+                eval_outputs, _ = utils.evaluateODT(eval_fns, self.ODTAgent)
                 outputs.update(eval_outputs)
     
             outputs["time/total"] = time.time() - self.start_time
@@ -377,6 +418,36 @@ class Experiment:
             if is_last_iter:
                 attn_layers = self.ODTAgent.get_attn_layers(self.device)
             online_iter += 1
+
+            self.tracker.epoch_end()
+            try:
+                # kWh used in each finished epoch; take the last one
+                epoch_kwh = float(self.tracker.tracker.total_energy_per_epoch()[-1])
+                # Average carbon intensity during this run (gCO2/kWh)
+                avg_ci = self.tracker.intensity_updater.average_carbon_intensity()
+                episode_co2_g = float(epoch_kwh * avg_ci.carbon_intensity)
+
+                self.queue.put({
+                    'tag': 'sustainability_episode',
+                    'kwh': epoch_kwh,              # kWh for this episode
+                    'co2': episode_co2_g,          # grams CO2e for this episode
+                    'episode': online_iter + self.odt_config["max_offline_iters"],
+                    'zone_index': self.zone_index,
+                    'aggregation_step': self.aggregation_num
+                })
+            except Exception as e:
+                # If Carbontracker wasn’t able to read (e.g., permissions/NVML), push a minimal record
+                self.queue.put({
+                    'tag': 'sustainability_episode',
+                    'kwh': None,
+                    'co2': None,
+                    'error': f'carbontracker_read_failed: {e}',
+                    'episode': online_iter + self.odt_config["max_offline_iters"],
+                    'zone_index': self.zone_index,
+                    'aggregation_step': self.aggregation_num
+                })
+
+        self.tracker.stop() # Stop tracking carbon emissions
         return attn_layers.detach().cpu(), online_dataset
 
     def loss_fn(self, a_hat_dist, a, attention_mask, entropy_reg):
@@ -387,8 +458,9 @@ class Experiment:
         return (loss, -log_likelihood, entropy)
 
 def train_odt(
-    ev_info,
+    queue,#Not used
     metrics_base_path,
+    ev_info,
     experiment_number,
     chargers,
     environment,
@@ -415,6 +487,7 @@ def train_odt(
     utils.set_seed_everywhere(int(seed))
     config['odt_hyperparameters']['max_online_iters'] = config['nn_hyperparameters']['num_episodes']
     params = {
+        "queue":                 queue,
         "ev_info":               ev_info,
         "metrics_base_path":     metrics_base_path,
         "experiment_number":     experiment_number,

@@ -9,12 +9,14 @@ import numpy as np
 import torch
 import time
 
-from environment.data_loader import save_to_csv
+from training_processes.writer_proccess import printer_queue
+
 
 MAX_EPISODE_LEN = 1000
 
 
 def create_vec_eval_episodes_fn(
+    queue,
     vec_env,
     eval_rtg,
     state_dim,
@@ -36,6 +38,7 @@ def create_vec_eval_episodes_fn(
     def eval_episodes_fn(model):
         target_return = [eval_rtg * reward_scale] * 1
         returns, lengths, _ = vec_evaluate_episode_rtg(
+            queue,
             vec_env,
             chargers,
             routes,
@@ -70,6 +73,7 @@ def create_vec_eval_episodes_fn(
 
 @torch.no_grad()
 def vec_evaluate_episode_rtg(
+    queue,
     environment,
     chargers,
     routes,
@@ -100,9 +104,6 @@ def vec_evaluate_episode_rtg(
     environment.reset_episode(chargers, routes, unique_chargers)
     model.eval()
     model.to(device=device)
-
-    # Set the number of vec_envs
-    num_envs = 1
     
     # Pre-allocate memory for trajectories for all cars with a fixed max length
     max_traj_len = 7  # or adjust based on expected max length
@@ -117,14 +118,13 @@ def vec_evaluate_episode_rtg(
 
     sim_done = False
     timestep_counter = 0
-    best_avg = float('-inf')
     episode_rewards = []
     dones = []
-    rewards = []
-#   metrics=[]
-    
+    #Maybe move outside of this file
+
+
     while not sim_done:
-        environment.init_routing()
+        timestep_counter = environment.init_routing()
         start_time_step = time.time()
 
         for car in range(num_cars):
@@ -151,14 +151,8 @@ def vec_evaluate_episode_rtg(
 
             # Execute action
             environment.generate_paths(action, None, car)
-
-        # Finalize simulation step
-        sim_done = environment.simulate_routes(timestep_counter)
-
-        # Gather results
-        arrived_at_final = environment.arrived_at_final
       
-        sim_done, timestep_reward, timestep_counter, arrived_at_final = environment.simulate_routes()
+        sim_done, timestep_reward, arrived_at_final = environment.simulate_routes()
         
         dones.extend(arrived_at_final.tolist())
         if timestep_counter == 0:
@@ -186,18 +180,20 @@ def vec_evaluate_episode_rtg(
             
         if timestep_counter >= environment.max_steps:
             raise Exception("MAX TIME-STEPS EXCEEDED!")
-                
 
     #SIM COMPLETE  
     # Calculate the average return per car
     episode_return = np.mean(np.sum(np.vstack(episode_rewards), axis=0))
     
-    station_data, agent_data, data_level = environment.get_data()
-    save_to_csv(station_data, f'{metrics_path}/metrics_station_{data_level}.csv', True)
-    save_to_csv(agent_data, f'{metrics_path}/metrics_agent_{data_level}.csv', True)
+    station_data, agent_data, = environment.get_data()
+    queue.put({
+        'tag': 'csv',
+        'station_data': station_data,
+        'agent_data': agent_data
+    })
     station_data = None
     agent_data = None
-    
+
     # Truncate trajectories to actual length before returning
     trajectories = [{
         'observations': traj['observations'][:traj['cur_len']].cpu(),
@@ -207,6 +203,5 @@ def vec_evaluate_episode_rtg(
         'car_num': traj['car_num']
     } for traj in trajectories]
 
+    
     return episode_return, timestep_counter, trajectories
-
-
