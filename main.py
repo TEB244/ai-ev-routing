@@ -295,7 +295,7 @@ def main_loop(args):
                     processes = []
                     for ind, charger_list in enumerate(chargers):
                         # Create arguments tuple for each process
-                        args_tuple = (queue, ev_info, experiment_number, charger_list,\
+                        args_tuple = (queue, data_dir, ev_info, experiment_number, charger_list,\
                                   copy.deepcopy(environment_list[ind]), all_routes[ind], date,\
                                   action_dim, global_weights, aggregate_step, ind, algorithm_dm,\
                                   chargers_seeds[ind], seed, args, eval_c['fixed_attributes'],\
