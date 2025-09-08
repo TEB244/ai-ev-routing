@@ -482,7 +482,7 @@ def main_loop(args):
                     weights_to_save = [None]
 
                     # Run directly without multiprocessing
-                    train_route(queue, data_dir,ev_info, experiment_number, chargers[0],\
+                    train_route(queue, data_dir, ev_info, experiment_number, chargers[0],\
                                 copy.deepcopy(environment_list[0]), all_routes[0], date,\
                                 action_dim, global_weights, aggregate_step, 0, algorithm_dm,\
                                 chargers_seeds[0], seed, args, eval_c['fixed_attributes'],\
@@ -504,7 +504,7 @@ def main_loop(args):
 
                     processes = []
                     for ind, charger_list in enumerate(chargers):
-                        args_tuple = (queue, ev_info, experiment_number, charger_list,\
+                        args_tuple = (queue, data_dir, ev_info, experiment_number, charger_list,\
                                   copy.deepcopy(environment_list[ind]), all_routes[ind], date,\
                                   action_dim, global_weights, aggregate_step, ind, algorithm_dm,\
                                   chargers_seeds[ind], seed, args, eval_c['fixed_attributes'],\
