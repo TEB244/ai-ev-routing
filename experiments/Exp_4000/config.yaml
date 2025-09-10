@@ -7,6 +7,7 @@ cma_parameters:
   model_type: optimizer
   population_dimension: 20
 environment_settings:
+  carbon_save_interval: 2
   action_dim: 3
   coords:
   - - 43.02120034946083

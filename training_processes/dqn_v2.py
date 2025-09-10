@@ -81,6 +81,8 @@ def train_dqn(queue,
 
     start_sequence = environment_c.get('start_sequence', 'static')
 
+    carbon_save_interval = environment_c.get('carbon_save_interval', 1)
+
     epsilon = nn_c['epsilon']
 
     discount_factor = nn_c['discount_factor']
@@ -536,34 +538,36 @@ def train_dqn(queue,
                 print(f"End of Episode Misc & Logging: {now - last_time:.4f}s")
             print(f"--- TOTAL EPISODE TIME: {now - episode_start_time:.4f}s ---")
 
-        tracker.epoch_end() # End tracking carbon emissions
 
-        try:
-            # kWh used in each finished epoch; take the last one
-            epoch_kwh = float(tracker.tracker.total_energy_per_epoch()[-1])
-            # Average carbon intensity during this run (gCO2/kWh)
-            avg_ci = tracker.intensity_updater.average_carbon_intensity()
-            episode_co2_g = float(epoch_kwh * avg_ci.carbon_intensity)
+        if i % carbon_save_interval == 0:
+            tracker.epoch_end() # End tracking carbon emissions
 
-            queue.put({
-                'tag': 'sustainability_episode',
-                'kwh': epoch_kwh,              # kWh for this episode
-                'co2': episode_co2_g,          # grams CO2e for this episode
-                'episode': i,
-                'zone_index': zone_index,
-                'aggregation_step': aggregation_num
-            })
-        except Exception as e:
-            # If Carbontracker wasn’t able to read (e.g., permissions/NVML), push a minimal record
-            queue.put({
-                'tag': 'sustainability_episode',
-                'kwh': None,
-                'co2': None,
-                'error': f'carbontracker_read_failed: {e}',
-                'episode': i,
-                'zone_index': zone_index,
-                'aggregation_step': aggregation_num
-            })
+            try:
+                # kWh used in each finished epoch; take the last one
+                epoch_kwh = float(tracker.tracker.total_energy_per_epoch()[-1])
+                # Average carbon intensity during this run (gCO2/kWh)
+                avg_ci = tracker.intensity_updater.average_carbon_intensity()
+                episode_co2_g = float(epoch_kwh * avg_ci.carbon_intensity)
+
+                queue.put({
+                    'tag': 'sustainability_episode',
+                    'kwh': epoch_kwh,              # kWh for this episode
+                    'co2': episode_co2_g,          # grams CO2e for this episode
+                    'episode': i,
+                    'zone_index': zone_index,
+                    'aggregation_step': aggregation_num
+                })
+            except Exception as e:
+                # If Carbontracker wasn’t able to read (e.g., permissions/NVML), push a minimal record
+                queue.put({
+                    'tag': 'sustainability_episode',
+                    'kwh': None,
+                    'co2': None,
+                    'error': f'carbontracker_read_failed: {e}',
+                    'episode': i,
+                    'zone_index': zone_index,
+                    'aggregation_step': aggregation_num
+                })
 
     # np.save(f'outputs/best_paths/route_{zone_index}_seed_{seed}.npy', np.array(best_paths, dtype=object))
 
