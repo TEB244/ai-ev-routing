@@ -175,7 +175,8 @@ def train_reinforce(queue,
 
         random_threshold = rng.random((num_episodes, num_cars))
 
-        tracker.epoch_start() # Start tracking carbon emissions
+        if i % carbon_save_interval == 0:
+            tracker.epoch_start() # Start tracking carbon emissions
 
         if save_offline_data:
             trajectories.extend([
@@ -404,7 +405,7 @@ def train_reinforce(queue,
                         f" Avg. IR: {round(avg_ir, 3):0.3f} - Epsilon: {round(epsilon, 3):0.3f}"
             print_l(to_print)
 
-        if i % carbon_save_interval == 0:
+        if i % carbon_save_interval == carbon_save_interval - 1:
             tracker.epoch_end() # End tracking carbon emissions
 
             try:

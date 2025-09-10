@@ -197,7 +197,8 @@ def train_dqn(queue,
 
         random_threshold = dqn_rng.random((num_episodes, num_cars))
 
-        tracker.epoch_start() # Start tracking carbon emissions
+        if i % carbon_save_interval == 0:
+            tracker.epoch_start() # Start tracking carbon emissions
 
         if save_offline_data:
             trajectories.extend([
@@ -539,7 +540,7 @@ def train_dqn(queue,
             print(f"--- TOTAL EPISODE TIME: {now - episode_start_time:.4f}s ---")
 
 
-        if i % carbon_save_interval == 0:
+        if i % carbon_save_interval == carbon_save_interval - 1:
             tracker.epoch_end() # End tracking carbon emissions
 
             try:
