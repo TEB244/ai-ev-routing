@@ -57,6 +57,9 @@ def train_route(queue, data_dir, ev_info, experiment_number, chargers, environme
         elif algorithm_dm == 'CMA':
             from training_processes.cma import train_cma as train
             
+        elif algorithm_dm == 'PYVRP':
+            from training_processes.pyvrp import train_pyvrp as train
+
         else:
             raise RuntimeError(f'model {algorithm_dm} algorithm not found.')
 

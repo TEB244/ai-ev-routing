@@ -17,3 +17,4 @@ tenacity
 plotly
 python-dotenv
 h5py
+pyvrp

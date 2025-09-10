@@ -320,6 +320,116 @@ class EnvironmentClass:
         info['episode_starting_charge'] = starting_charge
         self.info = info
 
+    def get_car_location(self, car_idx: int) -> tuple:
+        """
+        Get the starting location of the car.
+
+        Parameters:
+            car_idx (int): Index of the car.
+
+        Returns:
+            tuple: Tuple containing the (lat, lon) of the car's starting location.
+        """
+        org_lat, org_long, dest_lat, dest_long = self.routes[car_idx]
+
+        return (org_lat, org_long)
+
+    def get_client_locations(self, agent_idx: int, is_odt: bool = False) -> list:
+        """
+        Get all locations of the charging stations for an agent.
+
+        Parameters:
+            agent_idx (int): Index of the agent.
+            is_odt (bool): Whether the environment is ODT (default: False).
+
+        Returns:
+            list: List of tuples (lat, lon) for the agent's unique chargers.
+        """
+        if is_odt:
+            agent_chargers = self.chargers[0, agent_idx, :]
+        else:
+            agent_chargers = self.chargers[agent_idx, :, 0]
+
+        agent_unique_chargers = [(float(charger[1]), float(charger[2])) for charger in self.unique_chargers if charger[0] in agent_chargers]
+
+        return agent_unique_chargers
+
+    def get_node_locations_for_agent(self, agent_idx: int) -> list:
+        """
+        Gathers and orders all relevant locations for a single agent's routing problem.
+
+        The order is critical for the VRP solver:
+        - Node 0: Agent's current location.
+        - Nodes 1 to N-2: The agent's unique available chargers.
+        - Node N-1: The agent's final destination.
+
+        Parameters:
+            agent_idx (int): The index of the agent.
+
+        Returns:
+            list: A list of (latitude, longitude) tuples in the specified order.
+        """
+        # Get the agent's current start and final destination coordinates
+        start_lat, start_lon, dest_lat, dest_lon = self.routes[agent_idx]
+        current_location = (start_lat, start_lon)
+        final_destination = (dest_lat, dest_lon)
+
+        # self.agent is populated by the self.reset_agent() call, which happens
+        # right before path generation in the main loop.
+        # self.agent.unique_chargers is a list of tuples: (id, lat, lon)
+        charger_locations = [(lat, lon) for (id, lat, lon) in self.agent.unique_chargers]
+
+        # Combine all locations into a single list in the correct order
+        node_locations = [current_location] + charger_locations + [final_destination]
+        
+        return node_locations
+
+    def get_costs_for_agent(self, agent_idx: int, node_locations: list) -> tuple:
+        """
+        Calculates the distance and traffic cost matrices for a given list of nodes.
+
+        Parameters:
+            agent_idx (int): The index of the agent.
+            node_locations (list): The list of (lat, lon) tuples from get_node_locations_for_agent.
+
+        Returns:
+            tuple: A tuple containing (distance_matrix, traffic_matrix), both as np.ndarrays.
+        """
+        num_nodes = len(node_locations)
+        distance_matrix = np.zeros((num_nodes, num_nodes))
+        traffic_matrix = np.zeros((num_nodes, num_nodes))
+
+        # 1. Calculate the all-pairs distance matrix
+        for i in range(num_nodes):
+            for j in range(num_nodes):
+                loc1 = node_locations[i]
+                loc2 = node_locations[j]
+                distance_matrix[i, j] = haversine(loc1[0], loc1[1], loc2[0], loc2[1])
+
+        # 2. Construct the traffic cost matrix
+        # The traffic cost of traveling an edge (i, j) is modeled as the traffic
+        # level at the destination node 'j'. This mirrors the logic in your
+        # original re-weighting scheme.
+
+        # Create a mapping of node index to its traffic level.
+        # self.agent.unique_traffic is an array of [[charger_id, traffic_level], ...]
+        # Its order corresponds to the charger_locations list.
+        traffic_at_node = np.zeros(num_nodes)
+        
+        # Charger nodes (indices 1 to N-2) get their traffic values.
+        # `unique_traffic` is already filtered for the current agent in `reset_agent`.
+        num_chargers = len(self.agent.unique_traffic)
+        traffic_at_node[1 : 1 + num_chargers] = self.agent.unique_traffic[:, 1]
+        
+        # Start (node 0) and Destination (node N-1) have no intrinsic traffic cost.
+        # The traffic_at_node array is already zero for them.
+
+        # Populate the traffic matrix: cost to reach node 'j' is traffic_at_node[j].
+        for j in range(num_nodes):
+            traffic_matrix[:, j] = traffic_at_node[j]
+            
+        return distance_matrix, traffic_matrix
+
     def get_ev_info(self) -> np.ndarray:
         """
         Get the electric vehicle (EV) information.
@@ -747,7 +857,7 @@ class EnvironmentClass:
             self.agent_data = np.concatenate((self.agent_data, agent_data))
 
 
-    def generate_paths(self, distribution, fixed_attributes: list, agent_index: int):
+    def generate_paths(self, distribution, fixed_attributes: list, agent_index: int, preset_path: list = None):
         """
         Generate paths for the agents based on distribution and fixed attributes.
 
@@ -755,39 +865,48 @@ class EnvironmentClass:
             distribution (torch.Tensor): Distribution tensor for generating paths.
             fixed_attributes (list): Fixed attributes for path generation.
             agent_index (int): Index of the agent for which to generate paths.
+            preset_path (np.ndarray): Optional preset path for the agent.
         """
+
         # Generate graph of possible paths from chargers to each other, the origin, and destination
         graph = build_graph(self.agent.idx, self.step_size, self.info, self.agent.unique_chargers,\
                             self.agent.org_lat, self.agent.org_long, self.agent.dest_lat, self.agent.dest_long,\
                             self.charging_status[agent_index])
+
         self.charges_needed.append(copy.deepcopy(graph))
 
         if DEBUG:
             print("-------------")
             print(f"{agent_index} - CHARGES NEEDED - {graph}")
 
-        num_nodes_to_update = graph.shape[0] - 2
-        if not fixed_attributes:
-            # Assuming distribution has relevant values up to num_nodes_to_update
-            dist_slice = distribution[:num_nodes_to_update] # Keep on GPU
-            traffic_mult_tensor = 1 - dist_slice
-            distance_mult_tensor = dist_slice
+
+        if preset_path is None: # Reweight the graph based on the distribution provided
+            num_nodes_to_update = graph.shape[0] - 2
+            if not fixed_attributes:
+                # Assuming distribution has relevant values up to num_nodes_to_update
+                dist_slice = distribution[:num_nodes_to_update] # Keep on GPU
+                traffic_mult_tensor = 1 - dist_slice
+                distance_mult_tensor = dist_slice
+            else:
+                # Create tensors if using fixed attributes
+                traffic_mult_tensor = torch.full((num_nodes_to_update,), fixed_attributes[0],\
+                                                device=self.device, dtype=self.dtype)
+                distance_mult_tensor = torch.full((num_nodes_to_update,), fixed_attributes[1],\
+                                                device=self.device, dtype=self.dtype)
+
+            # Make sure all tensors are on the same device
+            unique_traffic_tensor = torch.from_numpy(self.agent.unique_traffic[:num_nodes_to_update, 1]).to(device=self.device, dtype=self.dtype)
+            graph_tensor = torch.from_numpy(graph).to(device=self.device, dtype=self.dtype) # Work with graph as tensor
+            
+            graph_tensor[:, :num_nodes_to_update] = graph_tensor[:, :num_nodes_to_update] * distance_mult_tensor +\
+                                                    unique_traffic_tensor * traffic_mult_tensor
+
+            graph = graph_tensor.cpu().detach().numpy()
+
+            path = dijkstra(graph, self.agent.idx)
+
         else:
-            # Create tensors if using fixed attributes
-            traffic_mult_tensor = torch.full((num_nodes_to_update,), fixed_attributes[0],\
-                                             device=self.device, dtype=self.dtype)
-            distance_mult_tensor = torch.full((num_nodes_to_update,), fixed_attributes[1],\
-                                              device=self.device, dtype=self.dtype)
-
-        # Make sure all tensors are on the same device
-        unique_traffic_tensor = torch.from_numpy(self.agent.unique_traffic[:num_nodes_to_update, 1]).to(device=self.device, dtype=self.dtype)
-        graph_tensor = torch.from_numpy(graph).to(device=self.device, dtype=self.dtype) # Work with graph as tensor
-        
-        graph_tensor[:, :num_nodes_to_update] = graph_tensor[:, :num_nodes_to_update] * distance_mult_tensor +\
-                                                unique_traffic_tensor * traffic_mult_tensor
-        graph = graph_tensor.cpu().detach().numpy()
-
-        path = dijkstra(graph, self.agent.idx)
+            path = preset_path
 
         if DEBUG:
             print(f"{agent_index} - PATH - {path}")
@@ -795,7 +914,19 @@ class EnvironmentClass:
         self.local_paths[agent_index] = copy.deepcopy(path)
 
         # Get stop ids from global list instead of only local to agent
-        stop_ids = np.array([self.agent.unique_traffic[step, 0] for step in path])
+        if preset_path is not None:
+            num_chargers = len(self.agent.unique_chargers)
+            # The 'path' from PyVRP contains node indices: 0 for start, 1 to num_chargers for chargers,
+            # and num_chargers + 1 for the destination.
+            # We need to filter for chargers and adjust the index to access self.agent.unique_traffic.
+            stop_ids = np.array([
+                self.agent.unique_traffic[step - 1, 0]
+                for step in path
+                if 1 <= step <= num_chargers
+            ])
+        else:
+            # Original logic for Dijkstra path
+            stop_ids = np.array([self.agent.unique_traffic[step, 0] for step in path])
 
         # Create a dictionary to map stop ids to their indices in self.traffic[:, 0]
         traffic_dict = {stop_id: idx for idx, stop_id in enumerate(self.traffic[:, 0])}
