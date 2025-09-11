@@ -60,6 +60,9 @@ def train_route(queue, data_dir, ev_info, experiment_number, chargers, environme
         elif algorithm_dm == 'PYVRP':
             from training_processes.pyvrp import train_pyvrp as train
 
+        elif algorithm_dm == 'BAYESIAN':
+            from training_processes.bayesian import train_bayesian as train
+
         else:
             raise RuntimeError(f'model {algorithm_dm} algorithm not found.')
 

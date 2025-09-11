@@ -18,3 +18,4 @@ plotly
 python-dotenv
 h5py
 pyvrp
+scikit-optimize

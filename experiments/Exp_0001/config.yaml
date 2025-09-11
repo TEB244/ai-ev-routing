@@ -1,6 +1,6 @@
 algorithm_settings:
   agent_by_zone: false
-  algorithm: PYVRP
+  algorithm: DQN
 cma_parameters:
   initial_sigma: 0.1
   max_generations: 200
@@ -23,7 +23,7 @@ environment_settings:
   - 170000
   - 90000
   - 170000
-  max_mini_sim_steps: 1000000
+  max_mini_sim_steps: 10
   max_sim_steps: 50
   models:
   - Tesla Model Y
@@ -111,3 +111,8 @@ odt_hyperparameters:
   save_dir: ./exp
   warmup_steps: 10000
   weight_decay: 0.0005
+bopt_hyperparameters:
+  n_calls_per_step: 50
+  n_initial_points: 10
+  search_range_min: -5.0
+  search_range_max: 5.0
