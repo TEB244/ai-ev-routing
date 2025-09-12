@@ -14,8 +14,6 @@ from environment._pathfinding import haversine
 from .odt.odt_helpers.utils import format_data, save_to_h5, save_temp_checkpoint
 from training_processes.writer_proccess import printer_queue
 
-from carbontracker.tracker import CarbonTracker
-
 def train_reinforce(queue,
                     data_dir,
                     ev_info,
@@ -89,7 +87,11 @@ def train_reinforce(queue,
     layers = nn_c['layers']
     aggregation_count = federated_c['aggregation_count'] if not args.eval else federated_c['aggregation_count_eval']
 
-    tracker = CarbonTracker(epochs=num_episodes, epochs_before_pred=0, monitor_epochs=-1, update_interval=1, verbose=0, ignore_errors=True)
+    if zone_index == 0:
+        from carbontracker.tracker import CarbonTracker
+        tracker = CarbonTracker(epochs=num_episodes, epochs_before_pred=0, monitor_epochs=-1, update_interval=1, verbose=0, ignore_errors=True)
+    else:
+        tracker = None
 
     epsilon = nn_c['epsilon']
     target_episode_epsilon_frac = nn_c['target_episode_epsilon_frac'] if 'target_episode_epsilon_frac' in nn_c else 0.3
@@ -175,7 +177,7 @@ def train_reinforce(queue,
 
         random_threshold = rng.random((num_episodes, num_cars))
 
-        if i % carbon_save_interval == 0:
+        if tracker is not None and i % carbon_save_interval == 0:
             tracker.epoch_start() # Start tracking carbon emissions
 
         if save_offline_data:
@@ -405,7 +407,7 @@ def train_reinforce(queue,
                         f" Avg. IR: {round(avg_ir, 3):0.3f} - Epsilon: {round(epsilon, 3):0.3f}"
             print_l(to_print)
 
-        if i % carbon_save_interval == carbon_save_interval - 1:
+        if tracker is not None and i % carbon_save_interval == carbon_save_interval - 1:
             tracker.epoch_end() # End tracking carbon emissions
 
             try:
@@ -435,7 +437,8 @@ def train_reinforce(queue,
                     'aggregation_step': aggregation_num
                 })
 
-    tracker.stop() # Stop tracking carbon emissions
+    if tracker is not None:
+        tracker.stop() # Stop tracking carbon emissions
 
     weights = [policy_network.cpu().state_dict() for policy_network in policy_networks]
     del policy_networks, optimizers

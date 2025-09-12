@@ -13,8 +13,6 @@ from environment._pathfinding import haversine
 from .odt.odt_helpers.utils import format_data, save_to_h5, save_temp_checkpoint
 from training_processes.writer_proccess import printer_queue
 
-from carbontracker.tracker import CarbonTracker
-
 def train_dqn(queue, 
               data_dir,
               ev_info, 
@@ -94,7 +92,12 @@ def train_dqn(queue,
     layers = nn_c['layers']
     aggregation_count = federated_c['aggregation_count'] if not args.eval else federated_c['aggregation_count_eval']
 
-    tracker = CarbonTracker(epochs=num_episodes, epochs_before_pred=0, monitor_epochs=-1, update_interval=1, verbose=0, ignore_errors=True)
+    # Only track carbon emissions for the first zone
+    if zone_index == 0:
+        from carbontracker.tracker import CarbonTracker
+        tracker = CarbonTracker(epochs=num_episodes, epochs_before_pred=0, monitor_epochs=-1, update_interval=1, verbose=0, ignore_errors=True)
+    else:
+        tracker = None
 
     target_network_update_frequency = nn_c['target_network_update_frequency'] if 'target_network_update_frequency' in nn_c else 25
 
@@ -197,7 +200,7 @@ def train_dqn(queue,
 
         random_threshold = dqn_rng.random((num_episodes, num_cars))
 
-        if i % carbon_save_interval == 0:
+        if tracker is not None and i % carbon_save_interval == 0:
             tracker.epoch_start() # Start tracking carbon emissions
 
         if save_offline_data:
@@ -540,7 +543,7 @@ def train_dqn(queue,
             print(f"--- TOTAL EPISODE TIME: {now - episode_start_time:.4f}s ---")
 
 
-        if i % carbon_save_interval == carbon_save_interval - 1:
+        if tracker is not None and i % carbon_save_interval == carbon_save_interval - 1:
             tracker.epoch_end() # End tracking carbon emissions
 
             try:
@@ -572,7 +575,8 @@ def train_dqn(queue,
 
     # np.save(f'outputs/best_paths/route_{zone_index}_seed_{seed}.npy', np.array(best_paths, dtype=object))
 
-    tracker.stop() # Stop tracking carbon emissions
+    if tracker is not None:
+        tracker.stop() # Stop tracking carbon emissions
 
     weights = [q_network.cpu().state_dict() for q_network in q_networks]
     del q_networks, target_q_networks, optimizers
