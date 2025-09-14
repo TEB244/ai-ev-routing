@@ -93,9 +93,19 @@ def train_dqn(queue,
     aggregation_count = federated_c['aggregation_count'] if not args.eval else federated_c['aggregation_count_eval']
 
     # Only track carbon emissions for the first zone
-    if zone_index == 0:
+    if zone_index == -1:
         from carbontracker.tracker import CarbonTracker
-        tracker = CarbonTracker(epochs=num_episodes, epochs_before_pred=0, monitor_epochs=-1, update_interval=1, verbose=0, ignore_errors=True)
+        tracker = CarbonTracker(epochs=num_episodes, epochs_before_pred=0, monitor_epochs=-1, update_interval=3, verbose=0, ignore_errors=True)
+
+        if args.server == 'DRAC':
+            print(f'Stopping intensity updater')
+            if getattr(tracker, "intensity_updater", None) is not None:
+                try:
+                    tracker.intensity_updater.stop()   # stop background fetches
+                    print(f'Intensity updater stopped')
+                except Exception:
+                    pass
+                tracker.intensity_updater = None
     else:
         tracker = None
 
@@ -549,14 +559,17 @@ def train_dqn(queue,
             try:
                 # kWh used in each finished epoch; take the last one
                 epoch_kwh = float(tracker.tracker.total_energy_per_epoch()[-1])
-                # Average carbon intensity during this run (gCO2/kWh)
-                avg_ci = tracker.intensity_updater.average_carbon_intensity()
-                episode_co2_g = float(epoch_kwh * avg_ci.carbon_intensity)
+
+                if args.server == 'DRAC':
+                    OFFLINE_CI_G_PER_KWH = 300.0 # gCO2/kWh
+                    episode_co2_g = epoch_kwh * OFFLINE_CI_G_PER_KWH
+                else:
+                    episode_co2_g = tracker.intensity_updater.average_carbon_intensity()
 
                 queue.put({
                     'tag': 'sustainability_episode',
-                    'kwh': epoch_kwh,              # kWh for this episode
-                    'co2': episode_co2_g,          # grams CO2e for this episode
+                    'kwh': epoch_kwh, # kWh for this episode
+                    'co2': episode_co2_g, # Cannot track on DRAC
                     'episode': i,
                     'zone_index': zone_index,
                     'aggregation_step': aggregation_num
