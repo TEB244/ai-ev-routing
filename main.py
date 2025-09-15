@@ -356,6 +356,9 @@ def main_loop(args):
                             continue
 
                         total_model_size_kb += sum(t.numel() * t.element_size() for t in tensors)
+
+                if algorithm_dm == 'MPC':
+                    total_model_size_kb = 0
                 #For state_dicts
                 else:
                     for i, weight_group in enumerate(local_weights_list):
@@ -380,7 +383,7 @@ def main_loop(args):
                                                         federated_c['zone_multiplier'],\
                                                         federated_c['model_multiplier'],\
                                                         agent_by_zone)
-                elif algorithm_dm == 'DENSER': 
+                elif algorithm_dm in ['DENSER', 'MPC']: 
                     # Cannot aggregate weights for DENSER because architecture is different between agents
                     pass
                 else:
