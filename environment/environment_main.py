@@ -320,6 +320,89 @@ class EnvironmentClass:
         info['episode_starting_charge'] = starting_charge
         self.info = info
 
+    def get_mpc_state_info(self, car_idx: int) -> dict:
+        """
+        Gathers the DYNAMIC state information for a single EV needed by the MPC solver.
+        
+        Parameters:
+            car_idx (int): The index of the car.
+        
+        Returns:
+            dict: A dictionary containing the car's current dynamic state.
+        """
+        # Get the current position of the car. If it's the first step, it's the origin.
+        # Otherwise, it's the last known position from self.tokens.
+        if self.tokens is None:
+            current_lat, current_lon, _, _ = self.routes[car_idx]
+        else:
+            current_lat, current_lon = self.tokens[car_idx].cpu().numpy()
+
+        return {
+            'car_idx': car_idx,
+            'current_pos': (current_lat, current_lon),
+            'battery_pct': (self.info['starting_charge'][car_idx] / self.info['max_charge'][car_idx]) * 100
+        }
+
+    def get_mpc_env_info(self, car_idx: int) -> dict:
+        """
+        Gathers the STATIC environment information for a single EV needed by the MPC solver.
+        This includes all possible nodes, distances, and cost models.
+
+        Parameters:
+            car_idx (int): The index of the car.
+
+        Returns:
+            dict: A dictionary containing the necessary environment parameters for the MIP.
+        """
+        # Use the agent_info populated during reset_agent to get agent-specific chargers
+        agent_chargers_info = self.agent.unique_chargers
+        charger_locations = {f"C_{int(cid)}": (lat, lon) for cid, lat, lon in agent_chargers_info}
+        
+        origin_lat, origin_lon, dest_lat, dest_lon = self.routes[car_idx]
+        
+        # Define all nodes for this EV's problem
+        # The keys are string identifiers used in the Pyomo model
+        nodes = {
+            f"O_{car_idx}": (origin_lat, origin_lon),
+            **charger_locations,
+            f"D_{car_idx}": (dest_lat, dest_lon)
+        }
+        node_names = list(nodes.keys())
+        node_coords = list(nodes.values())
+        
+        # Pre-compute all-pairs distance and energy cost matrices
+        num_nodes = len(node_names)
+        distance_matrix = np.zeros((num_nodes, num_nodes))
+        energy_matrix = np.zeros((num_nodes, num_nodes))
+        
+        # EV-specific parameters
+        usage_per_km = self.info['usage_per_hour'][car_idx] / 70 # Assuming average speed of 70 km/h
+        
+        for i in range(num_nodes):
+            for j in range(num_nodes):
+                if i == j: continue
+                dist = haversine(node_coords[i][0], node_coords[i][1], node_coords[j][0], node_coords[j][1])
+                distance_matrix[i, j] = dist
+                energy_matrix[i, j] = (dist * usage_per_km / self.info['max_charge'][car_idx]) * 100 # Energy cost as % of battery
+
+        return {
+            'nodes': node_names,
+            'node_positions': nodes,
+            'chargers': list(charger_locations.keys()),
+            'destination': f"D_{car_idx}",
+            'distances': {(n1, n2): distance_matrix[i, j] 
+                          for i, n1 in enumerate(node_names) 
+                          for j, n2 in enumerate(node_names)},
+            'energy_costs': {(n1, n2): energy_matrix[i, j] 
+                             for i, n1 in enumerate(node_names) 
+                             for j, n2 in enumerate(node_names)},
+            'current_traffic': {f"C_{int(cid)}": traffic for cid, traffic in self.agent.unique_traffic},
+            'traffic_predictor': TrafficPredictor(self.agent.unique_traffic),
+            'increase_rate': self.increase_rate,
+            'step_size': self.step_size,
+            'destination_pos': (dest_lat, dest_lon)
+        }
+
     def get_car_location(self, car_idx: int) -> tuple:
         """
         Get the starting location of the car.
@@ -908,17 +991,11 @@ class EnvironmentClass:
         else:
             path = preset_path
 
-        if DEBUG:
-            print(f"{agent_index} - PATH - {path}")
-
         self.local_paths[agent_index] = copy.deepcopy(path)
 
         # Get stop ids from global list instead of only local to agent
         if preset_path is not None:
             num_chargers = len(self.agent.unique_chargers)
-            # The 'path' from PyVRP contains node indices: 0 for start, 1 to num_chargers for chargers,
-            # and num_chargers + 1 for the destination.
-            # We need to filter for chargers and adjust the index to access self.agent.unique_traffic.
             stop_ids = np.array([
                 self.agent.unique_traffic[step - 1, 0]
                 for step in path
@@ -1106,6 +1183,17 @@ class EnvironmentClass:
         self.store_charges_needed = []
         self.store_local_paths = [[] for _ in range(self.num_cars)]
 
+
+class TrafficPredictor:
+    """A simple placeholder for a traffic prediction model."""
+    def __init__(self, initial_traffic_data):
+        # Store traffic as a dictionary: {'C_1': 5, 'C_2': 3}
+        self.current_traffic = {f"C_{int(cid)}": traffic for cid, traffic in initial_traffic_data}
+        
+    def predict(self, node_name: str, future_timestep: int):
+        # A naive predictor: assumes traffic stays constant.
+        # A more advanced model could predict trends based on time of day.
+        return self.current_traffic.get(node_name, 0)
 
 # if __name__ == "__main__":
 #     seeds = [1234, 5555, 2020, 2468, 11110, 4040, 3702, 16665, 6002, 6060]
