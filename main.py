@@ -242,8 +242,13 @@ def main_loop(args):
         manager = mp.Manager()
         weights_to_save = manager.list([None for _ in range(len(chargers))])
 
+        if algorithm_dm == 'MPC':
+            agg_count = 1
+        else:
+            agg_count = federated_c['aggregation_count']
+
         # Loop through aggregation steps
-        for aggregate_step in range(federated_c['aggregation_count']):
+        for aggregate_step in range(agg_count):
             try:
                 # # Start tracking emissions
                 # tracker = EmissionsTracker(
@@ -460,7 +465,12 @@ def main_loop(args):
         manager = mp.Manager()
         weights_to_save = manager.list([None for _ in range(len(chargers))])
 
-        for aggregate_step in range(federated_c['aggregation_count_eval']):
+        if algorithm_dm == 'MPC':
+            agg_count = 1
+        else:
+            agg_count = federated_c['aggregation_count_eval']
+
+        for aggregate_step in range(agg_count):
             try:
                 # Start tracking emissions
                 # tracker = EmissionsTracker(
