@@ -92,22 +92,24 @@ def train_dqn(queue,
     layers = nn_c['layers']
     aggregation_count = federated_c['aggregation_count'] if not args.eval else federated_c['aggregation_count_eval']
 
-    # Only track carbon emissions for the first zone
-    if zone_index == -1:
-        from carbontracker.tracker import CarbonTracker
-        tracker = CarbonTracker(epochs=num_episodes, epochs_before_pred=0, monitor_epochs=-1, update_interval=3, verbose=0, ignore_errors=True)
+    tracker = None
 
-        if args.server == 'DRAC':
-            print(f'Stopping intensity updater')
-            if getattr(tracker, "intensity_updater", None) is not None:
-                try:
-                    tracker.intensity_updater.stop()   # stop background fetches
-                    print(f'Intensity updater stopped')
-                except Exception:
-                    pass
-                tracker.intensity_updater = None
-    else:
-        tracker = None
+    # Only track carbon emissions for the first zone
+    # if zone_index == -1:
+    #     from carbontracker.tracker import CarbonTracker
+    #     tracker = CarbonTracker(epochs=num_episodes, epochs_before_pred=0, monitor_epochs=-1, update_interval=3, verbose=0, ignore_errors=True)
+
+    #     if args.server == 'DRAC':
+    #         print(f'Stopping intensity updater')
+    #         if getattr(tracker, "intensity_updater", None) is not None:
+    #             try:
+    #                 tracker.intensity_updater.stop()   # stop background fetches
+    #                 print(f'Intensity updater stopped')
+    #             except Exception:
+    #                 pass
+    #             tracker.intensity_updater = None
+    # else:
+    #     tracker = None
 
     target_network_update_frequency = nn_c['target_network_update_frequency'] if 'target_network_update_frequency' in nn_c else 25
 

@@ -87,11 +87,13 @@ def train_reinforce(queue,
     layers = nn_c['layers']
     aggregation_count = federated_c['aggregation_count'] if not args.eval else federated_c['aggregation_count_eval']
 
-    if zone_index == 0:
-        from carbontracker.tracker import CarbonTracker
-        tracker = CarbonTracker(epochs=num_episodes, epochs_before_pred=0, monitor_epochs=-1, update_interval=1, verbose=0, ignore_errors=True)
-    else:
-        tracker = None
+    tracker = None
+
+    # if zone_index == 0:
+    #     from carbontracker.tracker import CarbonTracker
+    #     tracker = CarbonTracker(epochs=num_episodes, epochs_before_pred=0, monitor_epochs=-1, update_interval=1, verbose=0, ignore_errors=True)
+    # else:
+    #     tracker = None
 
     epsilon = nn_c['epsilon']
     target_episode_epsilon_frac = nn_c['target_episode_epsilon_frac'] if 'target_episode_epsilon_frac' in nn_c else 0.3
