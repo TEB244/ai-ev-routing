@@ -1,0 +1,11 @@
+
+### Experiment 2123: ###
+--------------------------------
+Seed: 1234
+Model: ODT
+Season: spring
+Number of cars: 100
+Number of chargers: 1
+Number of episodes: 100
+Number of aggregations: 50
+Average rewards when training: False

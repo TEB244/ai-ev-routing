@@ -1,0 +1,11 @@
+
+### Experiment 2105: ###
+--------------------------------
+Seed: 1234
+Model: CMA
+Season: spring
+Number of cars: 100
+Number of chargers: 1
+Number of episodes: 10000
+Number of aggregations: 1000
+Average rewards when training: False

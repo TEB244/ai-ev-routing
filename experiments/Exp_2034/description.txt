@@ -1,0 +1,11 @@
+
+### Experiment 2034: ###
+--------------------------------
+Seed: 2020
+Model: DQN
+Season: spring
+Number of cars: 100
+Number of chargers: 1
+Number of episodes: 10000
+Number of aggregations: 10
+Average rewards when training: False

@@ -1,0 +1,11 @@
+
+### Experiment 2118: ###
+--------------------------------
+Seed: 2020
+Model: ODT
+Season: spring
+Number of cars: 100
+Number of chargers: 1
+Number of episodes: 50
+Number of aggregations: 100
+Average rewards when training: False

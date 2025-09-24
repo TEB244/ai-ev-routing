@@ -1,0 +1,11 @@
+
+### Experiment 2137: ###
+--------------------------------
+Seed: 3030
+Model: ODT
+Season: spring
+Number of cars: 100
+Number of chargers: 1
+Number of episodes: 2000
+Number of aggregations: 2
+Average rewards when training: False

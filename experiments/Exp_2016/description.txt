@@ -1,0 +1,11 @@
+
+### Experiment 2016: ###
+--------------------------------
+Seed: 2020
+Model: DQN
+Season: spring
+Number of cars: 100
+Number of chargers: 1
+Number of episodes: 100
+Number of aggregations: 125
+Average rewards when training: False

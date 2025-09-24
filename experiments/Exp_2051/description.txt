@@ -1,0 +1,11 @@
+
+### Experiment 2051: ###
+--------------------------------
+Seed: 1234
+Model: REINFORCE
+Season: spring
+Number of cars: 100
+Number of chargers: 1
+Number of episodes: 100
+Number of aggregations: 5000
+Average rewards when training: False

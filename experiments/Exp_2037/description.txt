@@ -1,0 +1,11 @@
+
+### Experiment 2037: ###
+--------------------------------
+Seed: 2020
+Model: REINFORCE
+Season: spring
+Number of cars: 100
+Number of chargers: 1
+Number of episodes: 2
+Number of aggregations: 5
+Average rewards when training: False

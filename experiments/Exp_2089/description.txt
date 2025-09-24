@@ -1,0 +1,11 @@
+
+### Experiment 2089: ###
+--------------------------------
+Seed: 3030
+Model: CMA
+Season: spring
+Number of cars: 100
+Number of chargers: 1
+Number of episodes: 100
+Number of aggregations: 2
+Average rewards when training: False
