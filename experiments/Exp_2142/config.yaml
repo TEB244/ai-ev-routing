@@ -1,7 +1,6 @@
 algorithm_settings:
   agent_by_zone: false
-  algorithm: DQN
-algorithm_settings.algorithm: ODT
+  algorithm: ODT
 cma_parameters:
   initial_sigma: 0.1
   max_generations: 200
@@ -36,7 +35,7 @@ environment_settings:
   radius: 20
   saving_data_deepness: episode_level
   season: spring
-  seed: 1234
+  seed: 2020
   start_sequence: random
   starting_charge: 6000
   step_size: 0.01
@@ -45,7 +44,6 @@ environment_settings:
   - 9840
   - 8460
   - 9360
-environment_settings.seed: 2020
 eval_config:
   continue_training: false
   display_training_times: false
@@ -61,18 +59,17 @@ eval_config:
     Local: /storage_1/merl/metrics//Exp
   verbose: true
 federated_learning_settings:
-  aggregation_count: 50
+  aggregation_count: 1
   city_multiplier: 0.15
   model_multiplier: 0.5
   zone_multiplier: 0.35
-federated_learning_settings.aggregation_count: 1
 nn_hyperparameters:
   average_rewards_when_training: false
   batch_size: 75
   buffer_limit: 150
   city_multiplier: 0.15
   discount_factor: 0.999
-  eps_per_save: 100
+  eps_per_save: 10000
   epsilon: 1
   epsilon_decay: 0.999
   layers:
@@ -83,11 +80,9 @@ nn_hyperparameters:
   log_std_decay_rate: 0.01
   max_num_timesteps: 300
   model_multiplier: 0.5
-  num_episodes: 200
+  num_episodes: 10000
   num_epochs: 10
   zone_multiplier: 0.35
-nn_hyperparameters.eps_per_save: 10000
-nn_hyperparameters.num_episodes: 10000
 odt_hyperparameters:
   K: 20
   activation_function: relu
