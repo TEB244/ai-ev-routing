@@ -12,6 +12,8 @@ from environment.data_loader import save_to_csv, load_config_file
 from environment._pathfinding import haversine
 from training_processes.writer_proccess import printer_queue
 
+from carbontracker.tracker import CarbonTracker
+
 
 def train_cma(queue,
               data_dir,
@@ -82,13 +84,31 @@ def train_cma(queue,
     # Getting Neural Network parameters
     config_fname = f'experiments/Exp_{experiment_number}/config.yaml'
     nn_c = load_config_file(config_fname)['nn_hyperparameters']
+    environment_c = load_config_file(config_fname)['environment_settings']
     eps_per_save = int(nn_c['eps_per_save'])
     num_episodes = nn_c['num_episodes'] if not args.eval else 100
 
-    num_cars = environment.num_cars
+    num_cars = environment_c['num_of_cars']
     num_agents = 1 if agent_by_zone else num_cars  # Determine number of agents based on assignment mode
 
     run_mode = 'Evaluating' if args.eval else "Training"
+
+    # Only track carbon emissions for the first zone
+    carbon_save_interval = environment_c.get('carbon_save_interval', 1)
+    if zone_index == -1:
+        tracker = CarbonTracker(epochs=num_episodes, epochs_before_pred=0, monitor_epochs=-1, update_interval=3, verbose=0, ignore_errors=True)
+
+        if args.server == 'DRAC':
+            print(f'Stopping intensity updater')
+            if getattr(tracker, "intensity_updater", None) is not None:
+                try:
+                    tracker.intensity_updater.stop()   # stop background fetches
+                    print(f'Intensity updater stopped')
+                except Exception:
+                    pass
+                tracker.intensity_updater = None
+    else:
+        tracker = None
     # log_path = f'logs/{date}-{run_mode}_logs.txt'
     # Get logging functions
     print_l, print_et = printer_queue(queue)
@@ -137,6 +157,10 @@ def train_cma(queue,
 
     # Evolution process: Loop over generations to evolve the population
     for generation in range(max_generation):
+
+        if tracker is not None and (generation % carbon_save_interval) == 0:
+            tracker.epoch_start() # Start tracking carbon emissions
+
         # CMA matrix able to work with 120 K dimensions but no more than that
         # Resetting the matrix if it goes beyond 120K 
         # Matrix has reached max limit? then, restart cma-es model
@@ -154,7 +178,7 @@ def train_cma(queue,
 
         while not sim_done:  # Keep going until every EV reaches its destination
 
-            environment.init_routing()
+            timestep = environment.init_routing()
             reward_timestep = 0
 
             start_time_step = time.time()
@@ -175,7 +199,7 @@ def train_cma(queue,
                     environment.generate_paths(torch.tensor(car_route, device=device), None, agent_idx)  
     
                 # Once all cars have routes, simulate routes in the environment and get results
-                sim_done, rewards_pop,_,_ = environment.simulate_routes(population_mode=True)
+                sim_done, rewards_pop, _ = environment.simulate_routes(population_mode=True)
 
                 if agent_by_zone:
                     fitnesses[pop_idx] = -1 * rewards_pop.sum(axis=0).mean()
@@ -202,7 +226,7 @@ def train_cma(queue,
         # Get the model index by using car_models[zone_index][agent_index]
         car_models = np.column_stack([info['model_type'] for info in ev_info]).T
         while not sim_done:  # Keep going until every EV reachewr its destination
-            environment.init_routing()
+            timestep = environment.init_routing()
             start_time_step = time.time()
             for car_idx in range(num_cars):
                 state = environment.reset_agent(car_idx)
@@ -214,7 +238,7 @@ def train_cma(queue,
                 generation_weights[agent_idx] = weights  # Store the best weights for this generation
 
             # Simulate the environment with the best solutions
-            sim_done, timestep_rewards, timestep,_ = environment.simulate_routes()
+            sim_done, timestep_rewards,_ = environment.simulate_routes()
 
             if timestep == 0:
                 episode_rewards = np.expand_dims(timestep_rewards,axis=0)
@@ -244,7 +268,7 @@ def train_cma(queue,
         station_data = None
         agent_data = None
         
-        avg_reward = episode_rewards.sum(axis=0).mean()
+        avg_reward = episode_rewards.sum(axis=0).mean().item()
         # Store the average reward
         avg_rewards.append((avg_reward, aggregation_num, zone_index, main_seed))  
         
@@ -264,9 +288,43 @@ def train_cma(queue,
                 print_l(to_print)
 
         # Store the average weights for the generation
-        avg_output_values[generation] = generation_weights.mean(axis=0)  
+        avg_output_values[generation] = generation_weights.mean(axis=0)
+        if tracker is not None and (generation % carbon_save_interval) == carbon_save_interval - 1:
+            tracker.epoch_end() # End tracking carbon emissions
+
+            try:
+                # kWh used in each finished epoch; take the last one
+                epoch_kwh = float(tracker.tracker.total_energy_per_epoch()[-1])
+
+                if args.server == 'DRAC':
+                    OFFLINE_CI_G_PER_KWH = 300.0 # gCO2/kWh
+                    episode_co2_g = epoch_kwh * OFFLINE_CI_G_PER_KWH
+                else:
+                    episode_co2_g = tracker.intensity_updater.average_carbon_intensity()
+
+                queue.put({
+                    'tag': 'sustainability_episode',
+                    'kwh': epoch_kwh, # kWh for this episode
+                    'co2': episode_co2_g, # Cannot track on DRAC
+                    'episode': generation,
+                    'zone_index': zone_index,
+                    'aggregation_step': aggregation_num
+                })
+            except Exception as e:
+                # If Carbontracker wasn’t able to read (e.g., permissions/NVML), push a minimal record
+                queue.put({
+                    'tag': 'sustainability_episode',
+                    'kwh': None,
+                    'co2': None,
+                    'error': f'carbontracker_read_failed: {e}',
+                    'episode': generation,
+                    'zone_index': zone_index,
+                    'aggregation_step': aggregation_num
+                })
 
     # Population evolution ends
+    if tracker is not None:
+        tracker.stop() # Stop tracking carbon emissions
 
     # Retrieve and print results for the best population after evolution
     final_rewards = environment.get_rewards(population_mode=True)

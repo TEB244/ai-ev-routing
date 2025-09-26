@@ -81,7 +81,8 @@ class CMAAgent:
             'popsize': self.population_size,
             'maxiter': self.max_generation,
             'bounds': bounds,
-            'seed': seed
+            'seed': seed,
+            'verb_disp': 0
         }
         es = cma.CMAEvolutionStrategy(initial_weights, initial_sigma, cma_config)
 

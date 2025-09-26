@@ -408,7 +408,7 @@ def main_loop(args):
                 
                 if sorted_list:
                     print_l('Min and Max rewards for the aggregation step:'+\
-                            f'{sorted_list[0], sorted_list[-1]}')
+                            f'{sorted_list[0]:.3f}, {sorted_list[-1]:.3f}')
                 else:
                     print_l("No rewards found for this aggregation step.")
                 rewards.extend(process_rewards)
