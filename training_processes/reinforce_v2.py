@@ -448,4 +448,4 @@ def train_reinforce(queue,
     # np.save(f'outputs/best_paths/route_{zone_index}_seed_{seed}.npy', np.array(best_paths, dtype=object))
 
     # Return final policy states, rewards, outputs, and metrics (and old buffers since REINFORCE does not use a replay buffer)
-    return [net.cpu().state_dict() for net in policy_networks], avg_rewards, avg_output_values, old_buffers
+    return weights, avg_rewards, avg_output_values, old_buffers
