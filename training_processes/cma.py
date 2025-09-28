@@ -12,8 +12,6 @@ from environment.data_loader import save_to_csv, load_config_file
 from environment._pathfinding import haversine
 from training_processes.writer_proccess import printer_queue
 
-from carbontracker.tracker import CarbonTracker
-
 
 def train_cma(queue,
               data_dir,
@@ -96,6 +94,7 @@ def train_cma(queue,
     # Only track carbon emissions for the first zone
     carbon_save_interval = environment_c.get('carbon_save_interval', 1)
     if zone_index == -1:
+        from carbontracker.tracker import CarbonTracker
         tracker = CarbonTracker(epochs=num_episodes, epochs_before_pred=0, monitor_epochs=-1, update_interval=3, verbose=0, ignore_errors=True)
 
         if args.server == 'DRAC':
