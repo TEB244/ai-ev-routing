@@ -1,28 +1,25 @@
 import os
 
-base_dir = "experiments"
+base_dir = "experiments/"
 
-# Get all experiment directories
-for dir in os.listdir(base_dir):
-    if dir.startswith("Exp_"):
-        if os.path.isdir(os.path.join(base_dir, dir)):
-            train_job_path = os.path.join(base_dir, dir, "train_job.sh")
-            eval_job_path = os.path.join(base_dir, dir, "eval_job.sh")
+exp_range = [2036, 2072]
 
-            if os.path.exists(train_job_path):
+for exp_num in range(exp_range[0], exp_range[1]):
+    exp_dir = os.path.join(base_dir, f"Exp_{exp_num:04d}")
 
-                with open(train_job_path, "r") as f:
-                    train_job = f.read()
-                    train_job = train_job.replace("app_v2.py", "main.py")
-                    
-                with open(train_job_path, "w") as f:
-                    f.write(train_job)
+    # Load train_job.sh
+    with open(os.path.join(exp_dir, "train_job.sh"), "r") as f:
+        train_job = f.read()
 
-            if os.path.exists(eval_job_path):
+    # Change --time=02:00:00 to --time=48:00:00
+    train_job = train_job.replace("--time=02:00:00", "--time=48:00:00")
 
-                with open(eval_job_path, "r") as f:
-                    eval_job = f.read()
-                    eval_job = eval_job.replace("app_v2.py", "main.py")
-                    
-                with open(eval_job_path, "w") as f:
-                    f.write(eval_job)
+    # Change --mem=6G to --mem=12G
+    train_job = train_job.replace("--mem=6G", "--mem=12G")
+
+    # Change /home/sgomezro/scratch/metrics/Exp to /home/hartman/scratch/metrics/Exp
+    train_job = train_job.replace("/home/sgomezro/scratch/metrics/Exp", "/home/hartman/scratch/metrics/Exp")
+
+    # Save train_job.sh
+    with open(os.path.join(exp_dir, "train_job.sh"), "w") as f:
+        f.write(train_job)
