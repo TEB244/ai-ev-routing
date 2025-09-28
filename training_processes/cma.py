@@ -81,8 +81,10 @@ def train_cma(queue,
 
     # Getting Neural Network parameters
     config_fname = f'experiments/Exp_{experiment_number}/config.yaml'
-    nn_c = load_config_file(config_fname)['nn_hyperparameters']
-    environment_c = load_config_file(config_fname)['environment_settings']
+    parameters = load_config_file(config_fname)
+    nn_c = parameters['nn_hyperparameters']
+    environment_c = parameters['environment_settings']
+    population_c = parameters['cma_parameters']
     eps_per_save = int(nn_c['eps_per_save'])
     num_episodes = nn_c['num_episodes'] if not args.eval else 100
 
@@ -130,7 +132,7 @@ def train_cma(queue,
         cma_agents_list.append(cma_agent)
 
     # Initialize output values storage
-    avg_output_values = torch.zeros((cma_agents_list[0].max_generation, action_dim), device=device)  
+    avg_output_values = torch.zeros((num_episodes, action_dim), device=device)  
     best_avg = float('-inf')  # Track the best average reward encountered
     best_paths = None  # Store the best paths observed
     trained = False  # Track whether training occurred
@@ -142,20 +144,18 @@ def train_cma(queue,
     # Save the current state of the environment for later restoration during evolution
     environment.population_mode_store()
     
-    cma_info = cma_agents_list[0]  # Retrieve information from the first CMA agent
-    population_size = cma_info.population_size  # Size of the population for evolution
+    population_size = population_c['population_dimension']  # Size of the population for evolution
     #Setting max generations
-    max_generation = cma_info.max_generation if run_mode == "Training" else 100
     
     generation_weights = torch.empty((num_agents, action_dim),device=device)  # Storage for weights per generation
 
 
     # Initialize matrices for storing solutions and fitness values during evolution
-    matrix_solutions = torch.zeros((population_size, num_agents, cma_info.out_size), device=device)
+    matrix_solutions = torch.zeros((population_size, num_agents, action_dim), device=device)
     fitnesses = torch.empty((population_size, num_agents), device=device)
 
     # Evolution process: Loop over generations to evolve the population
-    for generation in range(max_generation):
+    for generation in range(num_episodes):
 
         if tracker is not None and (generation % carbon_save_interval) == 0:
             tracker.epoch_start() # Start tracking carbon emissions
@@ -274,7 +274,7 @@ def train_cma(queue,
         # Print information at the log and command line
         if verbose:            
             to_print = f'(Aggregation: {aggregation_num + 1} Zone: {zone_index + 1} ' +\
-                        f'Generation: {generation + 1}/{cma_info.max_generation}) -'+\
+                        f'Generation: {generation + 1}/{num_episodes}) -'+\
                         f'avg reward {avg_rewards[-1][0]:.3f}'
             print_et(to_print, start_time)
             
@@ -282,7 +282,7 @@ def train_cma(queue,
         if avg_reward > best_avg:
             best_avg = avg_reward
             if verbose:
-                to_print = (f' Zone: {zone_index + 1} Gen: {generation + 1}/{cma_info.max_generation}'+\
+                to_print = (f' Zone: {zone_index + 1} Gen: {generation + 1}/{num_episodes}'+\
                             f' - New Best: {best_avg:.3f}')
                 print_l(to_print)
 
@@ -328,9 +328,9 @@ def train_cma(queue,
     # Retrieve and print results for the best population after evolution
     final_rewards = environment.get_rewards(population_mode=True)
     # print(f'Rewards for population evolution: {final_rewards.mean():.3f}'+\
-    #       f' after {cma_info.max_generation} generations')
+    #       f' after {num_episodes} generations')
     to_print = f'Rewards for population evolution: {final_rewards.mean():.3f}'+\
-               f' after {cma_info.max_generation} generations'
+               f' after {num_episodes} generations'
     print_l(to_print)
 
     # Save the trained models to disk
