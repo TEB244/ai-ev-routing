@@ -7,5 +7,5 @@ Season: spring
 Number of cars: 100
 Number of chargers: 1
 Number of episodes: 200
-Number of aggregations: 2000
+Number of aggregations: 50
 Average rewards when training: False

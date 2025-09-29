@@ -59,7 +59,7 @@ for i in range(num_permutations):
         'environment_settings.seed': config_permutations['seeds'][i  % len(config_permutations['seeds'])],
         'nn_hyperparameters.eps_per_save': config_permutations['num_eps_per_agg'][i // len(config_permutations['seeds']) % len(config_permutations['num_eps_per_agg'])],
         'nn_hyperparameters.num_episodes': config_permutations['num_eps_per_agg'][i // len(config_permutations['seeds']) % len(config_permutations['num_eps_per_agg'])],
-        'federated_learning_settings.aggregation_count': 10000 // config_permutations['num_eps_per_agg'][i // len(config_permutations['algorithms']) % len(config_permutations['num_eps_per_agg'])],
+        'federated_learning_settings.aggregation_count': 10000 // config_permutations['num_eps_per_agg'][i // len(config_permutations['seeds']) % len(config_permutations['num_eps_per_agg'])],
         'algorithm_settings.algorithm': config_permutations['algorithms'][i // len(config_permutations['seeds']) // len(config_permutations['num_eps_per_agg']) % len(config_permutations['algorithms'])],
     }
         

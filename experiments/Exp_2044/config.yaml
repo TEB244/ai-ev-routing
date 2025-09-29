@@ -59,7 +59,7 @@ eval_config:
     Local: /storage_1/merl/metrics//Exp
   verbose: true
 federated_learning_settings:
-  aggregation_count: 1
+  aggregation_count: 1000
   city_multiplier: 0.15
   model_multiplier: 0.5
   zone_multiplier: 0.35
