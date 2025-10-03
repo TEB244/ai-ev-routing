@@ -12,7 +12,7 @@ for exp_num in range(exp_range[0], exp_range[1]):
         train_job = f.read()
 
     # Change --time=02:00:00 to --time=48:00:00
-    train_job = train_job.replace("--time=02:00:00", "--time=48:00:00")
+    train_job = train_job.replace("--time=8:00:00", "--time=48:00:00")
 
     # Change --mem=6G to --mem=12G
     train_job = train_job.replace("--mem=6G", "--mem=12G")
