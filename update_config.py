@@ -2,7 +2,7 @@ import os
 
 base_dir = "experiments/"
 
-exp_range = [2036, 2072]
+exp_range = [2000, 2072]
 
 for exp_num in range(exp_range[0], exp_range[1]):
     exp_dir = os.path.join(base_dir, f"Exp_{exp_num:04d}")
