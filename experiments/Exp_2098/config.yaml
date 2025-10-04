@@ -35,7 +35,7 @@ environment_settings:
   radius: 20
   saving_data_deepness: episode_level
   season: spring
-  seed: 3030
+  seed: 2020
   start_sequence: random
   starting_charge: 6000
   step_size: 0.01
