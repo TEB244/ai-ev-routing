@@ -7,6 +7,8 @@
 #SBATCH --cpus-per-task=6
 #SBATCH --time=48:00:00
 #SBATCH --mem=12G
+#SBATCH --gpus-per-node=2
+#SBATCH --mem=12G
 
 
 #SBATCH --mail-type=FAIL,TIME_LIMIT
@@ -22,5 +24,5 @@ source ~/envs/merl_env/bin/activate
 # Enable multi-threading
 export OMP_NUM_THREADS=2
 
-python main.py  -e 2063 -d "/home/hartman/scratch/metrics/Exp" -verb True 
+python main.py  -e 2063 -d "/home/hartman/scratch/metrics/Exp" -g 0 1 -verb True 
     
