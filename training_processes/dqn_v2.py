@@ -90,7 +90,7 @@ def train_dqn(queue,
     buffer_limit = int(nn_c['buffer_limit'])
     max_timesteps = environment.max_steps
     layers = nn_c['layers']
-    aggregation_count = federated_c['aggregation_count'] if not args.eval else federated_c['aggregation_count_eval']
+    aggregation_count = federated_c['aggregation_count']
 
     tracker = None
 
