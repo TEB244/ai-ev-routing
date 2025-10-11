@@ -468,7 +468,7 @@ def main_loop(args):
         if algorithm_dm == 'MPC':
             agg_count = 1
         else:
-            agg_count = federated_c['aggregation_count_eval']
+            agg_count = federated_c['aggregation_count']
 
         for aggregate_step in range(agg_count):
             try:
@@ -483,7 +483,7 @@ def main_loop(args):
                 # tracker.start()
 
                 # Check if we have only one zone - if so, don't use multiprocessing
-                agg_print = f"{aggregate_step + 1}/{federated_c['aggregation_count_eval']}"
+                agg_print = f"{aggregate_step + 1}/{federated_c['aggregation_count']}"
                 print_l(f"\n\n############ Aggregation {agg_print} ############\n\n",)
 
                 if len(chargers) == 1:
