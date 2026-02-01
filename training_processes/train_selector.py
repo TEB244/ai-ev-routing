@@ -66,6 +66,9 @@ def train_route(queue, data_dir, ev_info, experiment_number, chargers, environme
         elif algorithm_dm == 'MPC':
             from training_processes.mpc import train_mpc as train
 
+        elif algorithm_dm == 'RWA':
+            from training_processes.rwa import train_rwa as train
+
         else:
             raise RuntimeError(f'model {algorithm_dm} algorithm not found.')
 

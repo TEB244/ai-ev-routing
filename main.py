@@ -131,7 +131,7 @@ def main_loop(args):
     os.makedirs(metrics_with_sub_dir)
 
 
-    if algorithm_dm in ["DQN", "PPO", "DDPG", "REINFORCE", "ODT"]: # reinforcement learning
+    if algorithm_dm in ["DQN", "PPO", "DDPG", "REINFORCE", "ODT", "RWA"]: # reinforcement learning
         num_episodes = c['nn_hyperparameters']['num_episodes']
         variant = c
     elif algorithm_dm in ['CMA', 'DENSER', 'NEAT']: # population based

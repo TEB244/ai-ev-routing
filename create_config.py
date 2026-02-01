@@ -11,7 +11,7 @@ job_base_dir = "experiments/Exp_4000" # Base directory to copy initial job files
 # Total permutations: 4 * 12 * 3 = 144
 
 config_permutations = {
-    'algorithms': ['DQN', 'REINFORCE', 'CMA', 'ODT'],
+    'algorithms': ['DQN', 'REINFORCE', 'CMA', 'ODT', 'RWA'],
     'num_eps_per_agg': [2, 5, 10, 50, 80, 100, 200, 500, 1000, 2000, 5000, 10000],
     'seeds': [1234, 2020, 3030],
 }

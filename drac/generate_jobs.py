@@ -41,6 +41,9 @@ def create_job(args):
             elif algorithm == 'ODT':
                 num_gpus = 4
                 allocation = "def-mcapretz"
+            elif algorithm == 'RWA':
+                num_gpus = 1
+                allocation = "def-mcapretz"
         
             # Calculate the time based on the total number of episodes
             # Note: these are rough estimates based on how long takes to train 10k episodes
@@ -49,6 +52,7 @@ def create_job(args):
                 'PPO': (80 / 6000) / 5, # 80 hours / 6k episodes / 5 zones
                 'CMA': (25 / 10000) / 4, # 16 hours / 10k generations 4 zones
                 'ODT': (14 / 2000) , # 15 hours for 2k episodes, 5 zones
+                'RWA': (50 / 6000) / 5, # TODO: Estimate - adjust based on actual performance
             }
         
             if algorithm in algorithm_time_mapping:
