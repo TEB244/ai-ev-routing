@@ -1,7 +1,7 @@
 #!/bin/bash
-#SBATCH --job-name=Exp_4000_train
-#SBATCH --output=experiments/Exp_4000/output.log
-#SBATCH --error=experiments/Exp_4000/error.log
+#SBATCH --job-name=Exp_4180_train
+#SBATCH --output=experiments/Exp_4180/output.log
+#SBATCH --error=experiments/Exp_4180/error.log
 #SBATCH -A def-mcapretz
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=6
@@ -11,7 +11,7 @@
 #SBATCH --mail-type=FAIL,TIME_LIMIT
 #SBATCH --mail-user=lhartma8@uwo.ca
 
-echo "Starting training for experiment 4000"
+echo "Starting training for experiment 4180"
 
 set -e  # Exit immediately if a command exits with a non-zero status
 
@@ -21,5 +21,5 @@ source ~/envs/merl_env/bin/activate
 # Enable multi-threading
 export OMP_NUM_THREADS=2
 
-python main.py  -e 4000 -d "/home/hartman/scratch/metrics/Exp" -verb True
+python main.py  -e 4180 -d "/home/hartman/scratch/metrics/Exp" -verb True
     

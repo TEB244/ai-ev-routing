@@ -1,11 +1,12 @@
 
-### Experiment 4000: ###
+### Experiment 4180: ###
 --------------------------------
 Seed: 1234
-Model: DQN
+Model: RWA (RL with Attention)
 Season: spring
 Number of cars: 100
 Number of chargers: 1
 Number of episodes: 200
 Number of aggregations: 50
 Average rewards when training: False
+Note: Copy of Exp_4000 (DQN baseline) with algorithm changed to RWA and learning rate bumped to 1e-4.

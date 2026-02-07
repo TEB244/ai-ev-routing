@@ -1,6 +1,6 @@
 algorithm_settings:
   agent_by_zone: false
-  algorithm: DQN
+  algorithm: RWA
 cma_parameters:
   initial_sigma: 0.1
   max_generations: 200
@@ -76,7 +76,7 @@ nn_hyperparameters:
   - 128
   - 64
   - 64
-  learning_rate: 1.0e-05
+  learning_rate: 1.0e-04
   log_std_decay_rate: 0.01
   max_num_timesteps: 300
   model_multiplier: 0.5
