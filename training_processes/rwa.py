@@ -86,10 +86,10 @@ def train_rwa(queue,
 
     # Load RWA-specific hyperparameters (with sensible defaults)
     rwa_c = load_config_file(config_fname).get('attention_hyperparameters', {})
-    embed_dim = rwa_c.get('embed_dim', 128)
+    embed_dim = rwa_c.get('embed_dim', 32)
     num_heads = rwa_c.get('num_heads', 4)
-    num_transformer_layers = rwa_c.get('num_layers', 2)
-    attention_dropout = rwa_c.get('attention_dropout', 0.1)
+    num_transformer_layers = rwa_c.get('num_layers', 1)
+    attention_dropout = rwa_c.get('attention_dropout', 0.0)
 
     start_sequence = environment_c.get('start_sequence', 'static')
     carbon_save_interval = environment_c.get('carbon_save_interval', 1)
@@ -145,7 +145,7 @@ def train_rwa(queue,
             else:
                 rwa_net.load_state_dict(global_weights[zone_index])
 
-        optimizer = optim.AdamW(rwa_net.parameters(), lr=learning_rate)
+        optimizer = optim.RMSprop(rwa_net.parameters(), lr=learning_rate)
         rwa_networks.append(rwa_net)
         optimizers.append(optimizer)
     else:
@@ -159,7 +159,7 @@ def train_rwa(queue,
                 else:
                     rwa_net.load_state_dict(global_weights[zone_index][model_indices[agent_ind]])
 
-            optimizer = optim.AdamW(rwa_net.parameters(), lr=learning_rate)
+            optimizer = optim.RMSprop(rwa_net.parameters(), lr=learning_rate)
             rwa_networks.append(rwa_net)
             optimizers.append(optimizer)
 

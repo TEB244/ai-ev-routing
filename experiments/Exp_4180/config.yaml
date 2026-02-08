@@ -76,7 +76,7 @@ nn_hyperparameters:
   - 128
   - 64
   - 64
-  learning_rate: 1.0e-04
+  learning_rate: 1.0e-05
   log_std_decay_rate: 0.01
   max_num_timesteps: 300
   model_multiplier: 0.5

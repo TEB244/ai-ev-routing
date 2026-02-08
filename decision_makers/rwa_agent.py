@@ -7,19 +7,17 @@ import numpy as np
 
 class TransformerBlock(nn.Module):
     """Pre-norm transformer block with multi-head self-attention and feed-forward network."""
-    def __init__(self, embed_dim, num_heads, attention_dropout=0.1):
+    def __init__(self, embed_dim, num_heads, dropout=0.0):
         super(TransformerBlock, self).__init__()
         self.ln1 = nn.LayerNorm(embed_dim)
         self.attn = nn.MultiheadAttention(
-            embed_dim, num_heads, dropout=attention_dropout, batch_first=True
+            embed_dim, num_heads, dropout=dropout, batch_first=True
         )
         self.ln2 = nn.LayerNorm(embed_dim)
         self.ffn = nn.Sequential(
-            nn.Linear(embed_dim, embed_dim * 4),
+            nn.Linear(embed_dim, embed_dim * 2),
             nn.GELU(),
-            nn.Dropout(attention_dropout),
-            nn.Linear(embed_dim * 4, embed_dim),
-            nn.Dropout(attention_dropout),
+            nn.Linear(embed_dim * 2, embed_dim),
         )
 
     def forward(self, x):
@@ -45,12 +43,12 @@ class RWANetwork(nn.Module):
     can learn which chargers to focus on given the current traffic/distance landscape.
 
     Architecture:
-        state → parse into charger tokens + context token
-        → embed → positional encoding → N transformer blocks
-        → extract context token → MLP policy head → softmax → action probs
+        state -> parse into charger tokens + context token
+        -> embed -> positional encoding -> transformer block
+        -> mean-pool all tokens -> MLP policy head -> softmax -> action probs
     """
-    def __init__(self, state_dim, action_dim, layers, embed_dim=128, num_heads=4,
-                 attention_dropout=0.1, num_transformer_layers=2):
+    def __init__(self, state_dim, action_dim, layers, embed_dim=32, num_heads=4,
+                 attention_dropout=0.0, num_transformer_layers=1):
         super(RWANetwork, self).__init__()
 
         self.state_dim = state_dim
@@ -59,23 +57,23 @@ class RWANetwork(nn.Module):
         self.embed_dim = embed_dim
 
         # Embedding layers
-        self.charger_embed = nn.Linear(2, embed_dim)          # Per-charger (traffic, distance) → embed_dim
-        self.global_embed = nn.Linear(6, embed_dim)            # Global context features → embed_dim (CLS token)
+        self.charger_embed = nn.Linear(2, embed_dim)    # Per-charger (traffic, distance) -> embed_dim
+        self.global_embed = nn.Linear(6, embed_dim)     # Global context features -> embed_dim (CLS token)
 
-        # Positional encoding for up to 31 tokens (1 context + 30 charger-legs = 10 chargers × 3 legs)
+        # Positional encoding for up to 31 tokens (1 context + 30 charger-legs = 10 chargers x 3 legs)
         max_positions = 31
         self.pos_embed = nn.Embedding(max_positions, embed_dim)
 
         # Transformer blocks
         self.transformer_blocks = nn.ModuleList([
-            TransformerBlock(embed_dim, num_heads, attention_dropout)
+            TransformerBlock(embed_dim, num_heads, dropout=attention_dropout)
             for _ in range(num_transformer_layers)
         ])
 
         # Final layer norm after transformer stack
         self.final_ln = nn.LayerNorm(embed_dim)
 
-        # Policy head: context token → action probabilities
+        # Policy head: pooled representation -> action probabilities
         head_hidden = layers[1] if len(layers) > 1 else 64
         self.policy_head = nn.Sequential(
             nn.Linear(embed_dim, head_hidden),
@@ -140,10 +138,10 @@ class RWANetwork(nn.Module):
         # Final layer norm
         tokens = self.final_ln(tokens)
 
-        # Pool: extract context token (position 0) — CLS-style
-        pooled = tokens[:, 0, :]  # (B, embed_dim)
+        # Pool: mean-pool ALL tokens (richer signal than CLS-only for short sequences)
+        pooled = tokens.mean(dim=1)  # (B, embed_dim)
 
-        # Policy head → softmax
+        # Policy head -> softmax
         logits = self.policy_head(pooled)
         probs = F.softmax(logits, dim=-1)
 
@@ -153,7 +151,7 @@ class RWANetwork(nn.Module):
         return probs
 
 
-def initialize(state_dim, action_dim, layers, device_agents, embed_dim=128, num_heads=4, attention_dropout=0.1):
+def initialize(state_dim, action_dim, layers, device_agents, embed_dim=32, num_heads=4, attention_dropout=0.0):
     """
     Initializes the RWANetwork for the RWA agent.
 
@@ -176,19 +174,17 @@ def initialize(state_dim, action_dim, layers, device_agents, embed_dim=128, num_
         embed_dim=embed_dim,
         num_heads=num_heads,
         attention_dropout=attention_dropout,
-        num_transformer_layers=2,
+        num_transformer_layers=1,
     )
     return rwa_network.to(device_agents)
 
 
 def compute_loss(experiences, gamma, rwa_network):
     """
-    Computes the loss for the RWA agent using policy gradients with baseline subtraction
-    and an entropy bonus for exploration.
+    Computes the policy gradient loss for the RWA agent.
 
-    Improvements over vanilla REINFORCE:
-        1. Return normalization (baseline subtraction) to reduce gradient variance
-        2. Entropy bonus to prevent premature policy collapse
+    Uses the same vanilla REINFORCE loss as the baseline — the architectural advantage
+    comes from the attention network itself, not from loss function modifications.
 
     Parameters:
         experiences (tuple): A tuple containing:
@@ -212,10 +208,6 @@ def compute_loss(experiences, gamma, rwa_network):
         returns.insert(0, G)
     returns = torch.tensor(returns, dtype=torch.float32, device=states.device)
 
-    # Baseline subtraction: normalize returns to reduce variance
-    if returns.numel() > 1 and returns.std() > 1e-8:
-        returns = (returns - returns.mean()) / (returns.std() + 1e-8)
-
     # Get action probabilities from attention-based network
     probs = rwa_network(states)
 
@@ -223,16 +215,10 @@ def compute_loss(experiences, gamma, rwa_network):
     action_indices = torch.argmax(actions, dim=-1)
 
     # Compute log probabilities for chosen actions
-    log_probs = torch.log(torch.gather(probs, 1, action_indices.unsqueeze(1)).squeeze(1) + 1e-8)
+    log_probs = torch.log(torch.gather(probs, 1, action_indices.unsqueeze(1)).squeeze(1))
 
-    # Policy gradient loss with baseline
-    policy_loss = -(log_probs * returns).mean()
-
-    # Entropy bonus: encourages exploration by penalizing low-entropy (deterministic) policies
-    entropy = -(probs * torch.log(probs + 1e-8)).sum(dim=-1).mean()
-    entropy_coeff = 0.01
-
-    loss = policy_loss - entropy_coeff * entropy
+    # REINFORCE loss: -log(pi(a|s)) * G
+    loss = -(log_probs * returns).mean()
 
     return loss
 
@@ -259,6 +245,7 @@ def agent_learn(experiences, gamma, rwa_network, optimizer, device):
 
     optimizer.zero_grad()
     loss.backward()
+    # Apply gradient clipping to prevent exploding gradients
     torch.nn.utils.clip_grad_norm_(rwa_network.parameters(), max_norm=1.0)
     optimizer.step()
 
