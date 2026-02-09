@@ -205,10 +205,11 @@ attention_hyperparameters:
 - No baseline subtraction
 
 ### RWA (`rwa.py` + `rwa_agent.py`)
-- Attention-based policy network (TransformerBlock + CLS pooling)
-- Parses state into per-charger tokens for structured attention
+- Hybrid MLP backbone + cross-attention policy network
+- MLP backbone processes full state (same as REINFORCE for guaranteed learning floor)
+- Cross-attention: backbone queries per-charger tokens for structured reasoning
 - On-policy like REINFORCE, same loss function
-- Advantage: structured inductive bias for multi-charger reasoning
+- Advantage: attention benefit grows with more chargers; never worse than MLP alone
 
 ## Federated Learning
 

@@ -72,7 +72,12 @@ def printer_queue(queue: mp.Queue):
 
     def print_elapsed_time(msg, start_t):
         et = time.time() - start_t
-        h = f"{int(et // 3600):02}:{int((et % 3600) // 60):02}:{int(et % 60):02}"
+        if et < 1:
+            h = f"{et*1000:.0f}ms"
+        elif et < 60:
+            h = f"{et:.1f}s"
+        else:
+            h = f"{int(et // 3600):02}:{int((et % 3600) // 60):02}:{int(et % 60):02}"
         queue.put({
             'tag':'log',
             'data': f'{msg} - {h}'

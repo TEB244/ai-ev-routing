@@ -86,7 +86,7 @@ def train_rwa(queue,
 
     # Load RWA-specific hyperparameters (with sensible defaults)
     rwa_c = load_config_file(config_fname).get('attention_hyperparameters', {})
-    embed_dim = rwa_c.get('embed_dim', 32)
+    embed_dim = rwa_c.get('embed_dim', 64)
     num_heads = rwa_c.get('num_heads', 4)
     num_transformer_layers = rwa_c.get('num_layers', 1)
     attention_dropout = rwa_c.get('attention_dropout', 0.0)
@@ -396,7 +396,8 @@ def train_rwa(queue,
             to_print =  f"(Agg.: {aggregation_num + 1} - Zone: {zone_index + 1}"+\
                         f" - Episode: {i + 1}/{num_episodes})\t"+\
                         f" et: {int(et // 3600):02d}h{int((et % 3600) // 60):02d}m{int(et % 60):02d}s"+\
-                        f"- Avg. Reward {round(float(avg_reward.cpu().numpy()), 3):0.3f} - Time-steps: {timestep},"+\
+                        f"- Avg. Reward {round(float(avg_reward.cpu().numpy()), 3):0.3f}"+\
+                        f" - Best: {round(float(best_avg), 3):0.3f} - Time-steps: {timestep},"+\
                         f" Avg. IR: {round(avg_ir, 3):0.3f} - Epsilon: {round(epsilon, 3):0.3f}"
             print_l(to_print)
 
