@@ -299,7 +299,11 @@ def train_reinforce(queue,
 
         if train_model:
             st = time.time()
-            for agent_ind in range(num_agents):
+            # Always train on all cars' data. When agent_by_zone=True, the shared
+            # network learns from every car's experience (not just car 0).
+            # This matches DQN's behavior which iterates range(num_cars).
+            num_train = num_cars
+            for agent_ind in range(num_train):
                 experiences = (states[i, agent_ind, :timestep], actions[i, agent_ind, :timestep], rewards[i, agent_ind, :timestep], dones[i, agent_ind, :timestep])
 
                 if agent_by_zone:
@@ -315,7 +319,7 @@ def train_reinforce(queue,
 
         epsilon *= epsilon_decay  # Decay epsilon
         if train_model:
-            epsilon = max(0.1, epsilon) # Minimal learning threshold
+            epsilon = max(0.01, epsilon) # Minimal exploration threshold (lowered from 0.1 for on-policy methods)
 
         avg_reward = episode_rewards.sum(axis=0).mean()
         avg_rewards.append((avg_reward, aggregation_num, zone_index, main_seed)) 

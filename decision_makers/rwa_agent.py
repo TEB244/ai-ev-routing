@@ -44,7 +44,11 @@ class RWANetwork(nn.Module):
         2. Cross-attention: the backbone's learned representation queries per-charger tokens
            (traffic, distance) to identify which charger routes matter most.
         3. Fusion: backbone output and attention output are concatenated and fed to a
-           policy head that produces action probabilities via softmax.
+           policy head that produces action means (raw logits) for a Gaussian policy.
+
+    The action space is continuous [0,1] per charger-leg dimension. Sigmoid is applied
+    externally (in the training loop) to map logits to [0,1] for the environment.
+    A learnable log-standard-deviation parameter controls exploration.
 
     This design ensures:
         - Guaranteed learning (MLP backbone works even if attention contributes nothing)
@@ -78,12 +82,15 @@ class RWANetwork(nn.Module):
         )
         self.attn_ln = nn.LayerNorm(backbone_dim)
 
-        # --- Policy head (fuses backbone + attention) ---
+        # --- Policy head (fuses backbone + attention) → raw logits ---
         self.policy_head = nn.Sequential(
             nn.Linear(backbone_dim * 2, layers[1]),  # 128 → 64
             nn.ReLU(),
             nn.Linear(layers[1], action_dim),         # 64 → 3
         )
+
+        # Learnable log-standard-deviation for the Gaussian policy (one per action dim)
+        self.log_std = nn.Parameter(torch.zeros(action_dim))
 
     def forward(self, state):
         """
@@ -93,7 +100,7 @@ class RWANetwork(nn.Module):
             state (torch.Tensor): Input state tensor of shape (state_dim,) or (batch, state_dim).
 
         Returns:
-            torch.Tensor: Action probabilities of shape (action_dim,) or (batch, action_dim).
+            torch.Tensor: Action means (raw logits) of shape (action_dim,) or (batch, action_dim).
         """
         squeezed = False
         if state.dim() == 1:
@@ -115,15 +122,28 @@ class RWANetwork(nn.Module):
         attn_out, _ = self.cross_attn(query, charger_tokens, charger_tokens)  # (B, 1, backbone_dim)
         attn_out = self.attn_ln(attn_out.squeeze(1))  # (B, backbone_dim)
 
-        # --- Fuse backbone + attention and produce action probabilities ---
+        # --- Fuse backbone + attention and produce action means (raw logits) ---
         fused = torch.cat([backbone_out, attn_out], dim=-1)  # (B, backbone_dim * 2)
-        logits = self.policy_head(fused)
-        probs = F.softmax(logits, dim=-1)
+        mean = self.policy_head(fused)  # Raw logits, no softmax
 
         if squeezed:
-            probs = probs.squeeze(0)
+            mean = mean.squeeze(0)
 
-        return probs
+        return mean
+
+    def get_distribution(self, state):
+        """
+        Returns a Gaussian distribution over actions for the given state.
+
+        Parameters:
+            state (torch.Tensor): Input state.
+
+        Returns:
+            torch.distributions.Normal: Gaussian distribution with learned mean and std.
+        """
+        mean = self.forward(state)
+        std = torch.exp(self.log_std).expand_as(mean)
+        return torch.distributions.Normal(mean, std)
 
 
 def initialize(state_dim, action_dim, layers, device_agents, embed_dim=64, num_heads=4, attention_dropout=0.0):
@@ -158,15 +178,17 @@ def initialize(state_dim, action_dim, layers, device_agents, embed_dim=64, num_h
 
 def compute_loss(experiences, gamma, rwa_network):
     """
-    Computes the policy gradient loss for the RWA agent.
+    Computes the continuous policy gradient loss for the RWA agent.
 
-    Uses the same vanilla REINFORCE loss as the baseline — the architectural advantage
-    comes from the attention network itself, not from loss function modifications.
+    Uses a Gaussian policy: the network outputs action means, and log-probabilities
+    are computed under Normal(mean, std) for the actual continuous actions taken.
+    The architectural advantage comes from the attention network itself, not from
+    loss function modifications. Includes return normalization and entropy bonus.
 
     Parameters:
         experiences (tuple): A tuple containing:
             - states (torch.tensor): Batch of states.
-            - actions (torch.tensor): Batch of actions (or action distributions).
+            - actions (torch.tensor): Batch of continuous actions taken (logit-space values).
             - rewards (torch.tensor): Batch of rewards.
             - dones (torch.tensor): Batch of done flags indicating episode termination.
         gamma (float): Discount factor for future rewards.
@@ -185,17 +207,19 @@ def compute_loss(experiences, gamma, rwa_network):
         returns.insert(0, G)
     returns = torch.tensor(returns, dtype=torch.float32, device=states.device)
 
-    # Get action probabilities from attention-based network
-    probs = rwa_network(states)
+    # Normalize returns for variance reduction (baseline-free variance reduction)
+    if len(returns) > 1:
+        returns = (returns - returns.mean()) / (returns.std() + 1e-8)
 
-    # Convert action distributions to discrete action indices
-    action_indices = torch.argmax(actions, dim=-1)
+    # Get Gaussian distribution and compute log-probability of taken actions
+    dist = rwa_network.get_distribution(states)
+    log_probs = dist.log_prob(actions).sum(dim=-1)  # Sum log-probs across action dimensions
 
-    # Compute log probabilities for chosen actions
-    log_probs = torch.log(torch.gather(probs, 1, action_indices.unsqueeze(1)).squeeze(1))
+    # Entropy bonus to encourage exploration (prevents premature convergence)
+    entropy = dist.entropy().sum(dim=-1)
 
-    # REINFORCE loss: -log(pi(a|s)) * G
-    loss = -(log_probs * returns).mean()
+    # REINFORCE loss: -(log_prob * return) with entropy bonus
+    loss = -(log_probs * returns).mean() - 0.01 * entropy.mean()
 
     return loss
 
@@ -206,10 +230,10 @@ def agent_learn(experiences, gamma, rwa_network, optimizer, device):
 
     Parameters:
         experiences (tuple): A tuple containing:
-            - states (numpy.array): Batch of states.
-            - actions (numpy.array): Batch of actions taken.
-            - rewards (numpy.array): Batch of rewards.
-            - dones (numpy.array): Batch of done flags indicating episode termination.
+            - states (torch.tensor): Batch of states.
+            - actions (torch.tensor): Batch of continuous actions taken.
+            - rewards (torch.tensor): Batch of rewards.
+            - dones (torch.tensor): Batch of done flags indicating episode termination.
         gamma (float): Discount factor for future rewards.
         rwa_network (RWANetwork): The RWA network to be trained.
         optimizer (torch.optim.Optimizer): Optimizer for updating the network's weights.
@@ -229,7 +253,12 @@ def agent_learn(experiences, gamma, rwa_network, optimizer, device):
 
 def get_actions(state, rwa_networks, episode_index, agent_index, device, epsilon, random_threshold, nn_by_zone):
     """
-    Selects actions for an agent using the attention-based policy network with epsilon-greedy exploration.
+    Selects continuous actions by sampling from the Gaussian policy.
+
+    During exploration (epsilon-greedy), samples with increased noise.
+    During exploitation, samples from the learned Gaussian distribution.
+    Actions are returned in logit space; sigmoid is applied externally in the training loop
+    before passing to the environment.
 
     Parameters:
         state (torch.tensor): The current state of the agent.
@@ -242,19 +271,26 @@ def get_actions(state, rwa_networks, episode_index, agent_index, device, epsilon
         nn_by_zone (bool): Whether to use a single network per zone.
 
     Returns:
-        torch.tensor: The probabilities for all actions.
+        torch.tensor: Sampled continuous actions in logit space.
     """
-    if random_threshold[episode_index, agent_index] < epsilon:
-        with torch.no_grad():
-            output_size = rwa_networks[0](state).size(0)
-        probs = torch.tensor(np.random.rand(output_size), device=device)
+    if nn_by_zone:
+        net = rwa_networks[0]
     else:
-        if nn_by_zone:
-            probs = rwa_networks[0](state)
-        else:
-            probs = rwa_networks[agent_index](state)
+        net = rwa_networks[agent_index]
 
-    return probs.detach()
+    with torch.no_grad():
+        if random_threshold[episode_index, agent_index] < epsilon:
+            # Exploration: sample from policy with extra noise for broader search
+            dist = net.get_distribution(state)
+            explore_std = torch.exp(net.log_std) + 0.5  # Augmented standard deviation
+            explore_dist = torch.distributions.Normal(dist.loc, explore_std)
+            action = explore_dist.sample()
+        else:
+            # Exploitation: sample from learned Gaussian policy
+            dist = net.get_distribution(state)
+            action = dist.sample()
+
+    return action.detach()
 
 
 def save_model(network, filename):

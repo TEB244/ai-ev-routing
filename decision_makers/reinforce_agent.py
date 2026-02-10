@@ -6,7 +6,13 @@ import numpy as np
 
 class PolicyNetwork(nn.Module):
     """
-    A neural network for the REINFORCE algorithm that outputs action probabilities.
+    A neural network for the REINFORCE algorithm that outputs continuous actions
+    via a Gaussian policy. The network outputs action means (logits), and a learnable
+    log-standard-deviation parameter controls exploration.
+
+    The action space is continuous [0,1] per charger-leg dimension, where each dimension
+    independently controls the distance vs. traffic tradeoff weight for graph reweighting.
+    Sigmoid is applied externally (in the training loop) to map logits to [0,1] for the environment.
     """
     def __init__(self, state_dim, action_dim, layers):
         super(PolicyNetwork, self).__init__()
@@ -17,19 +23,35 @@ class PolicyNetwork(nn.Module):
                 linear_layer = nn.Linear(state_dim, layer_size)
             else:
                 linear_layer = nn.Linear(layers[i - 1], layer_size)
-            
+
             self.layers.append(linear_layer)
 
         self.output = nn.Linear(layers[-1], action_dim)
-        
+
+        # Learnable log-standard-deviation for the Gaussian policy (one per action dim)
+        self.log_std = nn.Parameter(torch.zeros(action_dim))
+
     def forward(self, state):
         x = state
         for i in range(len(self.layers)):
             x = self.layers[i](x)
             x = torch.relu(x)  # Apply ReLU activation
-        x = self.output(x)
-        probs = F.softmax(x, dim=-1)
-        return probs
+        mean = self.output(x)
+        return mean  # Raw logits (action means), no softmax
+
+    def get_distribution(self, state):
+        """
+        Returns a Gaussian distribution over actions for the given state.
+
+        Parameters:
+            state (torch.Tensor): Input state.
+
+        Returns:
+            torch.distributions.Normal: Gaussian distribution with learned mean and std.
+        """
+        mean = self.forward(state)
+        std = torch.exp(self.log_std).expand_as(mean)
+        return torch.distributions.Normal(mean, std)
 
 def initialize(state_dim, action_dim, layers, device_agents):
     """
@@ -49,15 +71,18 @@ def initialize(state_dim, action_dim, layers, device_agents):
 
 def compute_loss(experiences, gamma, policy_network):
     """
-    Computes the loss for the REINFORCE agent by multiplying the log probability of each taken action
-    by the discounted return.
+    Computes the continuous policy gradient loss for the REINFORCE agent.
+
+    Uses a Gaussian policy: the network outputs action means, and log-probabilities
+    are computed under Normal(mean, std) for the actual continuous actions taken.
+    Includes return normalization for variance reduction and an entropy bonus
+    to encourage exploration.
 
     Parameters:
         experiences (tuple): A tuple containing:
             - states (torch.tensor): Batch of states.
-            - actions (torch.tensor): Batch of actions (or action distributions).
+            - actions (torch.tensor): Batch of continuous actions taken (logit-space values).
             - rewards (torch.tensor): Batch of rewards.
-            - next_states (torch.tensor): Batch of next states (not used in REINFORCE).
             - dones (torch.tensor): Batch of done flags indicating episode termination.
         gamma (float): Discount factor for future rewards.
         policy_network (PolicyNetwork): The policy network to be trained.
@@ -76,18 +101,19 @@ def compute_loss(experiences, gamma, policy_network):
         returns.insert(0, G)
     returns = torch.tensor(returns, dtype=torch.float32, device=states.device)
 
-    # Get the policy's probability distribution over actions
-    probs = policy_network(states)
+    # Normalize returns for variance reduction (baseline-free variance reduction)
+    if len(returns) > 1:
+        returns = (returns - returns.mean()) / (returns.std() + 1e-8)
 
-    # Convert action distributions to discrete action indices (argmax)
-    # so that gather indices have the correct shape for discrete actions
-    action_indices = torch.argmax(actions, dim=-1)
+    # Get Gaussian distribution and compute log-probability of taken actions
+    dist = policy_network.get_distribution(states)
+    log_probs = dist.log_prob(actions).sum(dim=-1)  # Sum log-probs across action dimensions
 
-    # Compute log probabilities for chosen actions
-    log_probs = torch.log(torch.gather(probs, 1, action_indices.unsqueeze(1)).squeeze(1))
+    # Entropy bonus to encourage exploration (prevents premature convergence)
+    entropy = dist.entropy().sum(dim=-1)
 
-    # REINFORCE loss: - (log(pi(a|s)) * G)
-    loss = - (log_probs * returns).mean()
+    # REINFORCE loss: -(log_prob * return) with entropy bonus
+    loss = -(log_probs * returns).mean() - 0.01 * entropy.mean()
     return loss
 
 def agent_learn(experiences, gamma, policy_network, optimizer, device):
@@ -96,11 +122,10 @@ def agent_learn(experiences, gamma, policy_network, optimizer, device):
 
     Parameters:
         experiences (tuple): A tuple containing:
-            - states (numpy.array): Batch of states.
-            - actions (numpy.array): Batch of actions taken.
-            - rewards (numpy.array): Batch of rewards.
-            - next_states (numpy.array): Batch of next states (not used in REINFORCE).
-            - dones (numpy.array): Batch of done flags indicating episode termination.
+            - states (torch.tensor): Batch of states.
+            - actions (torch.tensor): Batch of continuous actions taken.
+            - rewards (torch.tensor): Batch of rewards.
+            - dones (torch.tensor): Batch of done flags indicating episode termination.
         gamma (float): Discount factor for future rewards.
         policy_network (PolicyNetwork): The policy network to be trained.
         optimizer (torch.optim.Optimizer): Optimizer for updating the policy network's weights.
@@ -120,8 +145,12 @@ def agent_learn(experiences, gamma, policy_network, optimizer, device):
 
 def get_actions(state, policy_networks, episode_index, agent_index, device, epsilon, random_threshold, nn_by_zone):
     """
-    Selects actions for an agent using a mixture of distribution sampling and greedy approach
-    (based on an epsilon threshold).
+    Selects continuous actions by sampling from the Gaussian policy.
+
+    During exploration (epsilon-greedy), samples with increased noise.
+    During exploitation, samples from the learned Gaussian distribution.
+    Actions are returned in logit space; sigmoid is applied externally in the training loop
+    before passing to the environment.
 
     Parameters:
         state (torch.tensor): The current state of the agent.
@@ -131,22 +160,30 @@ def get_actions(state, policy_networks, episode_index, agent_index, device, epsi
         device (torch.device): The device on which the policy network runs.
         epsilon (float): Exploration rate for action selection.
         random_threshold (numpy.array): Array of random thresholds for epsilon-greedy action selection.
+        nn_by_zone (bool): Whether to use a single network per zone.
 
     Returns:
-        torch.tensor: The probabilities for all actions.
+        torch.tensor: Sampled continuous actions in logit space.
     """
 
-    if random_threshold[episode_index, agent_index] < epsilon:
-        with torch.no_grad():
-            output_size = policy_networks[0](state).size(0)
-        probs = torch.tensor(np.random.rand(output_size), device=device)
+    if nn_by_zone:
+        net = policy_networks[0]
     else:
-        if nn_by_zone:
-            probs = policy_networks[0](state)
+        net = policy_networks[agent_index]
+
+    with torch.no_grad():
+        if random_threshold[episode_index, agent_index] < epsilon:
+            # Exploration: sample from policy with extra noise for broader search
+            dist = net.get_distribution(state)
+            explore_std = torch.exp(net.log_std) + 0.5  # Augmented standard deviation
+            explore_dist = torch.distributions.Normal(dist.loc, explore_std)
+            action = explore_dist.sample()
         else:
-            probs = policy_networks[agent_index](state)  # Greedy action
-        
-    return probs.detach()
+            # Exploitation: sample from learned Gaussian policy
+            dist = net.get_distribution(state)
+            action = dist.sample()
+
+    return action.detach()
 
 def save_model(network, filename):
     """
@@ -160,5 +197,3 @@ def save_model(network, filename):
         None
     """
     torch.save(network.state_dict(), filename)
-
-
