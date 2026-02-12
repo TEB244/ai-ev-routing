@@ -145,8 +145,8 @@ def get_actions(state, q_networks, random_threshold, epsilon, episode_index, age
             action_values = q_networks[0](state)
         else:
             action_values = q_networks[agent_index](state)
-        noise = torch.randn(action_values.size()) * epsilon  # Match the size of the action_values tensor
-        action_values += noise.to(device)  # Add noise for exploration
+        noise = torch.randn(action_values.size(), device=device) * epsilon  # Create noise directly on device
+        action_values += noise  # Add noise for exploration
     else:
         if nn_by_zone:
             action_values = q_networks[0](state)  # Greedy action

@@ -70,12 +70,13 @@ def train_dqn(queue,
 
     print(f'Running DQN V2')
 
-    # Getting Neural Network parameters
+    # Getting Neural Network parameters (single YAML parse instead of 4)
     config_fname = f'experiments/Exp_{experiment_number:04d}/config.yaml'
-    nn_c = load_config_file(config_fname)['nn_hyperparameters']
-    eval_c = load_config_file(config_fname)['eval_config']
-    federated_c = load_config_file(config_fname)['federated_learning_settings']
-    environment_c = load_config_file(config_fname)['environment_settings']
+    config = load_config_file(config_fname)
+    nn_c = config['nn_hyperparameters']
+    eval_c = config['eval_config']
+    federated_c = config['federated_learning_settings']
+    environment_c = config['environment_settings']
 
     start_sequence = environment_c.get('start_sequence', 'static')
 
@@ -206,11 +207,13 @@ def train_dqn(queue,
     best_paths = None
     avg_output_values = [] # List to store the average values of output neurons for each episode
 
+    # Pre-generate all random thresholds (instead of regenerating full matrix each episode)
+    random_threshold = dqn_rng.random((num_episodes, num_cars))
+
     # Initialize simulation for the aggregation step
     environment.init_sim(aggregation_num)
     for i in range(num_episodes): # For each episode
 
-        random_threshold = dqn_rng.random((num_episodes, num_cars))
 
         if tracker is not None and i % carbon_save_interval == 0:
             tracker.epoch_start() # Start tracking carbon emissions
@@ -239,8 +242,9 @@ def train_dqn(queue,
         dones   = torch.zeros((num_cars, max_timesteps), dtype=dtype, device=device)
         
         # Episode includes every car reaching their destination
-        environment.reset_episode(chargers, routes, unique_chargers)  
+        environment.reset_episode(chargers, routes, unique_chargers)
         sim_done = False
+        episode_start_time = time.time()
         time_start_paths = time.time()
 
         if zone_index == 0 and track_times:
@@ -541,10 +545,12 @@ def train_dqn(queue,
 
         if verbose:
             et = time.time() - start_time
+            ep_duration = time.time() - episode_start_time
             to_print =  f"(Agg.: {aggregation_num + 1} - Zone: {zone_index + 1}"+\
                         f" - Episode: {i + 1}/{num_episodes})\t"+\
                         f" et: {int(et // 3600):02d}h{int((et % 3600) // 60):02d}m{int(et % 60):02d}s"+\
-                        f"- Avg. Reward {round(float(avg_reward.cpu().numpy()), 3):0.3f} - Time-steps: {timestep},"+\
+                        f" - ep: {ep_duration:.2f}s"+\
+                        f" - Avg. Reward {round(float(avg_reward.cpu().numpy()), 3):0.3f} - Time-steps: {timestep},"+\
                         f" Avg. IR: {round(avg_ir, 3):0.3f} - Epsilon: {round(epsilon, 3):0.3f}"
             print_l(to_print)
 

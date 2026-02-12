@@ -77,15 +77,16 @@ def train_rwa(queue,
 
     print(f'Running RWA (RL with Attention)')
 
-    # Getting Neural Network parameters
+    # Getting Neural Network parameters (single YAML parse instead of 5)
     config_fname = f'experiments/Exp_{experiment_number}/config.yaml'
-    nn_c = load_config_file(config_fname)['nn_hyperparameters']
-    eval_c = load_config_file(config_fname)['eval_config']
-    federated_c = load_config_file(config_fname)['federated_learning_settings']
-    environment_c = load_config_file(config_fname)['environment_settings']
+    config = load_config_file(config_fname)
+    nn_c = config['nn_hyperparameters']
+    eval_c = config['eval_config']
+    federated_c = config['federated_learning_settings']
+    environment_c = config['environment_settings']
 
     # Load RWA-specific hyperparameters (with sensible defaults)
-    rwa_c = load_config_file(config_fname).get('attention_hyperparameters', {})
+    rwa_c = config.get('attention_hyperparameters', {})
     embed_dim = rwa_c.get('embed_dim', 64)
     num_heads = rwa_c.get('num_heads', 4)
     num_transformer_layers = rwa_c.get('num_layers', 1)
@@ -169,17 +170,13 @@ def train_rwa(queue,
     best_paths = None
     avg_output_values = []
 
-    distributions = torch.zeros((num_episodes, num_cars, max_timesteps, action_dim), dtype=dtype, device=device)
-    actions = torch.zeros((num_episodes, num_cars, max_timesteps, action_dim), dtype=dtype, device=device)
-    states  = torch.zeros((num_episodes, num_cars, max_timesteps+1, state_dimension), dtype=dtype, device=device)
-    rewards = torch.zeros((num_episodes, num_cars, max_timesteps), dtype=dtype, device=device)
-    dones   = torch.zeros((num_episodes, num_cars, max_timesteps), dtype=dtype, device=device)
+    # Pre-generate all random thresholds (instead of regenerating full matrix each episode)
+    random_threshold = rng.random((num_episodes, num_cars))
 
     # Initialize simulation for the aggregation step
     environment.init_sim(aggregation_num)
     for i in range(num_episodes):
 
-        random_threshold = rng.random((num_episodes, num_cars))
 
         if tracker is not None and i % carbon_save_interval == 0:
             tracker.epoch_start()
@@ -200,13 +197,17 @@ def train_rwa(queue,
                 for car_idx in range(num_cars)
             ])
 
-        # Reset environment for this episode
+        # Allocate per-episode tensors (PyTorch allocator reuses memory automatically)
+        actions = torch.zeros((num_cars, max_timesteps, action_dim), dtype=dtype, device=device)
+        states  = torch.zeros((num_cars, max_timesteps+1, state_dimension), dtype=dtype, device=device)
+        rewards = torch.zeros((num_cars, max_timesteps), dtype=dtype, device=device)
+        dones   = torch.zeros((num_cars, max_timesteps), dtype=dtype, device=device)
+
+        # Reset environment
         environment.reset_episode(chargers, routes, unique_chargers)
         sim_done = False
+        episode_start_time = time.time()
         time_start_paths = time.time()
-
-        new_rewards = []
-        list_rewards = []
 
         while not sim_done:
             timestep = environment.init_routing()
@@ -229,7 +230,7 @@ def train_rwa(queue,
 
                 state_np = environment.reset_agent(car_idx)
                 state = torch.tensor(state_np, dtype=dtype, device=device)
-                states[i, car_idx, timestep] = state
+                states[car_idx, timestep] = state
 
                 if save_offline_data:
                     car_traj['observations'].append(state_np)
@@ -237,13 +238,12 @@ def train_rwa(queue,
                 # Get action distribution from attention-based policy
                 action_probs = get_actions(state, rwa_networks, i, car_idx, device, epsilon, random_threshold, agent_by_zone)
 
-                actions[i, car_idx, timestep] = action_probs
-
-                if save_offline_data:
-                    car_traj['actions'].append(action_probs.detach().cpu().numpy().tolist())
+                actions[car_idx, timestep] = action_probs
 
                 distribution = torch.sigmoid(action_probs)
-                distributions[i, car_idx, timestep] = distribution
+
+                if save_offline_data:
+                    car_traj['actions'].append(distribution.detach().cpu().numpy().tolist())
 
                 environment.generate_paths(distribution, fixed_attributes, car_idx)
 
@@ -253,14 +253,6 @@ def train_rwa(queue,
                     paths = np.load(f'outputs/best_paths/route_{zone_index}_seed_{main_seed}.npy',
                                     allow_pickle=True).tolist()
 
-            paths_copy = None
-            paths_copy = copy.deepcopy(environment.paths)
-
-            # Track output distribution stats
-            episode_avg_output_values = actions[i, :, :timestep, :].mean(axis=(0, 1))
-            avg_output_values.append((episode_avg_output_values.tolist(), i,
-                                      aggregation_num, zone_index, main_seed))
-
             if display_training_times:
                 print_et('Get Paths', time_start_paths)
 
@@ -269,7 +261,7 @@ def train_rwa(queue,
             # Run simulation and get results
             sim_done, timestep_reward, arrived_at_final = environment.simulate_routes()
 
-            dones[i, :, timestep] = arrived_at_final
+            dones[:, timestep] = arrived_at_final
 
             # Accumulate episode rewards
             if timestep == 0:
@@ -281,10 +273,10 @@ def train_rwa(queue,
             if nn_c['average_rewards_when_training']:
                 avg_reward = timestep_reward.sum(axis=0) / len(timestep_reward)
                 timestep_reward_avg = [avg_reward for _ in timestep_reward]
-                rewards[i, :, timestep] = timestep_reward_avg
+                rewards[:, timestep] = timestep_reward_avg
             # Train the model using the rewards from its own experiences
             else:
-                rewards[i, :, timestep] = timestep_reward
+                rewards[:, timestep] = timestep_reward
 
             if save_offline_data:
                 arrived = environment.get_odt_info()
@@ -298,6 +290,11 @@ def train_rwa(queue,
             if timestep >= environment.max_steps:
                 raise Exception("MAX TIME-STEPS EXCEEDED!")
 
+        # Track output distribution stats (once per episode, after all timesteps)
+        episode_avg_output_values = actions[:, :timestep, :].mean(dim=(0, 1))
+        avg_output_values.append((episode_avg_output_values.tolist(), i,
+                                  aggregation_num, zone_index, main_seed))
+
         if train_model:
             st = time.time()
             # Always train on all cars' data. When agent_by_zone=True, the shared
@@ -305,7 +302,7 @@ def train_rwa(queue,
             # This matches DQN's behavior which iterates range(num_cars).
             num_train = num_cars
             for agent_ind in range(num_train):
-                experiences = (states[i, agent_ind, :timestep], actions[i, agent_ind, :timestep], rewards[i, agent_ind, :timestep], dones[i, agent_ind, :timestep])
+                experiences = (states[agent_ind, :timestep], actions[agent_ind, :timestep], rewards[agent_ind, :timestep], dones[agent_ind, :timestep])
 
                 if agent_by_zone:
                     agent_learn(experiences, discount_factor, rwa_networks[0],
@@ -389,7 +386,7 @@ def train_rwa(queue,
 
         if avg_reward > best_avg:
             best_avg = avg_reward
-            best_paths = paths_copy
+            best_paths = copy.deepcopy(environment.paths)  # Only deepcopy when new best found
             if verbose:
                 print_l(f'Zone: {zone_index + 1} - New Best: {best_avg}')
 
@@ -397,10 +394,12 @@ def train_rwa(queue,
 
         if verbose:
             et = time.time() - start_time
+            ep_duration = time.time() - episode_start_time
             to_print =  f"(Agg.: {aggregation_num + 1} - Zone: {zone_index + 1}"+\
                         f" - Episode: {i + 1}/{num_episodes})\t"+\
                         f" et: {int(et // 3600):02d}h{int((et % 3600) // 60):02d}m{int(et % 60):02d}s"+\
-                        f"- Avg. Reward {round(float(avg_reward.cpu().numpy()), 3):0.3f}"+\
+                        f" - ep: {ep_duration:.2f}s"+\
+                        f" - Avg. Reward {round(float(avg_reward.cpu().numpy()), 3):0.3f}"+\
                         f" - Best: {round(float(best_avg), 3):0.3f} - Time-steps: {timestep},"+\
                         f" Avg. IR: {round(avg_ir, 3):0.3f} - Epsilon: {round(epsilon, 3):0.3f}"
             print_l(to_print)

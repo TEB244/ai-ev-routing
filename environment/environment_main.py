@@ -966,25 +966,18 @@ class EnvironmentClass:
         if preset_path is None: # Reweight the graph based on the distribution provided
             num_nodes_to_update = graph.shape[0] - 2
             if not fixed_attributes:
-                # Assuming distribution has relevant values up to num_nodes_to_update
-                dist_slice = distribution[:num_nodes_to_update] # Keep on GPU
-                traffic_mult_tensor = 1 - dist_slice
-                distance_mult_tensor = dist_slice
+                # Pull the small distribution slice to CPU (only num_chargers*3 floats)
+                # and do all reweighting in numpy — avoids GPU round-trip for trivial math
+                dist_np = distribution[:num_nodes_to_update].detach().cpu().numpy().astype(np.float64)
+                traffic_mult = 1 - dist_np
+                distance_mult = dist_np
             else:
-                # Create tensors if using fixed attributes
-                traffic_mult_tensor = torch.full((num_nodes_to_update,), fixed_attributes[0],\
-                                                device=self.device, dtype=self.dtype)
-                distance_mult_tensor = torch.full((num_nodes_to_update,), fixed_attributes[1],\
-                                                device=self.device, dtype=self.dtype)
+                traffic_mult = np.full(num_nodes_to_update, fixed_attributes[0])
+                distance_mult = np.full(num_nodes_to_update, fixed_attributes[1])
 
-            # Make sure all tensors are on the same device
-            unique_traffic_tensor = torch.from_numpy(self.agent.unique_traffic[:num_nodes_to_update, 1]).to(device=self.device, dtype=self.dtype)
-            graph_tensor = torch.from_numpy(graph).to(device=self.device, dtype=self.dtype) # Work with graph as tensor
-            
-            graph_tensor[:, :num_nodes_to_update] = graph_tensor[:, :num_nodes_to_update] * distance_mult_tensor +\
-                                                    unique_traffic_tensor * traffic_mult_tensor
-
-            graph = graph_tensor.cpu().detach().numpy()
+            traffic_values = self.agent.unique_traffic[:num_nodes_to_update, 1]
+            graph[:, :num_nodes_to_update] = graph[:, :num_nodes_to_update] * distance_mult +\
+                                              traffic_values * traffic_mult
 
             path = dijkstra(graph, self.agent.idx)
 
@@ -1092,22 +1085,18 @@ class EnvironmentClass:
         # Update starting routes
         if self.tokens != None:
             # Convert new_starting_positions tensor to a Python list
-            new_starting_positions = self.tokens.tolist()
-            
-            # Iterate through each route and update the starting positions
+            # Transfer tokens to CPU numpy once (faster than .tolist() which creates Python objects)
+            new_pos = self.tokens.cpu().numpy()
+
+            # Update starting positions for each route
+            num_positions = len(new_pos)
             new_routes = []
             for i, route in enumerate(self.routes):
-                if i < len(new_starting_positions):
-                    # Update starting latitude and longitude
-                    new_start_lat = new_starting_positions[i][0]
-                    new_start_lon = new_starting_positions[i][1]
-                    updated_route = [new_start_lat, new_start_lon, route[2], route[3]]
-                    new_routes.append(updated_route)
+                if i < num_positions:
+                    new_routes.append([float(new_pos[i, 0]), float(new_pos[i, 1]), route[2], route[3]])
                 else:
-                    # If there are more routes than positions, keep the original route
                     new_routes.append(route)
-    
-            # Update self.routes with the new starting positions
+
             self.routes = new_routes
 
             # Sets starting battery to ending battery of last timestep
