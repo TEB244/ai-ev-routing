@@ -74,8 +74,8 @@ def compute_loss(experiences, gamma, q_network, target_q_network):
     # Compute the next Q-values for all actions from the target network
     with torch.no_grad():
         next_Q_values = target_q_network(next_states)
-        # Get the maximum Q-value for each next state to use for each distribution element
-        max_next_Q_values = next_Q_values.max(1, keepdim=True)[0]  # Max Q-value per next state, shaped as (batch_size, 1)
+        # Average Q-values across dimensions (all outputs are cooperative weights, not competing discrete actions)
+        max_next_Q_values = next_Q_values.mean(dim=1, keepdim=True)  # Mean Q-value per next state, shaped as (batch_size, 1)
 
     # Compute target Q-values for each output in the distribution
     # We add (gamma * max_next_Q_values * (1 - dones)) to each element in the distribution to create per-action targets

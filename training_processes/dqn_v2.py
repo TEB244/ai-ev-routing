@@ -88,7 +88,7 @@ def train_dqn(queue,
     learning_rate= nn_c['learning_rate']
     num_episodes = nn_c['num_episodes']
     batch_size   = int(nn_c['batch_size'])
-    buffer_limit = int(nn_c['buffer_limit'])
+    buffer_limit = max(int(nn_c['buffer_limit']), 5000)  # Ensure minimum buffer size for stable replay
     max_timesteps = environment.max_steps
     layers = nn_c['layers']
     aggregation_count = federated_c['aggregation_count']
@@ -320,7 +320,7 @@ def train_dqn(queue,
 
             # Calculate the average values of the output neurons for this episode
             # episode_avg_output_values = np.mean(actions, axis=0)
-            episode_avg_output_values = actions[:,:timestep,:].mean(axis=(0, 1))
+            episode_avg_output_values = actions[:,:timestep+1,:].mean(axis=(0, 1))
             avg_output_values.append((episode_avg_output_values.tolist(), i,\
                                       aggregation_num, zone_index, main_seed)) # Double check, likely error src
 
@@ -373,12 +373,13 @@ def train_dqn(queue,
         ########### STORE EXPERIENCES ###########
 
         for car_idx in range(num_cars):
-            state_car  = states[car_idx,:timestep]
-            action_car = actions[car_idx,:timestep]
-            reward_car = rewards[car_idx,:timestep]
-            next_state = states[car_idx,1:timestep+1]
-            done_car   = dones[car_idx,:timestep]
-            buffers[car_idx].add(state_car, action_car, reward_car, next_state, done_car, timestep)
+            t = timestep + 1  # Include data stored at index `timestep` (off-by-one fix)
+            state_car  = states[car_idx,:t]
+            action_car = actions[car_idx,:t]
+            reward_car = rewards[car_idx,:t]
+            next_state = states[car_idx,1:t+1]
+            done_car   = dones[car_idx,:t]
+            buffers[car_idx].add(state_car, action_car, reward_car, next_state, done_car, t)
         
         if zone_index == 0 and track_times:
             now = time.time()

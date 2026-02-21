@@ -29,7 +29,7 @@ class PolicyNetwork(nn.Module):
         self.output = nn.Linear(layers[-1], action_dim)
 
         # Learnable log-standard-deviation for the Gaussian policy (one per action dim)
-        self.log_std = nn.Parameter(torch.zeros(action_dim))
+        self.log_std = nn.Parameter(torch.full((action_dim,), -0.5))  # std≈0.6 instead of 1.0 for less initial noise
 
     def forward(self, state):
         x = state
@@ -102,7 +102,7 @@ def compute_loss(experiences, gamma, policy_network):
     returns = torch.tensor(returns, dtype=torch.float32, device=states.device)
 
     # Normalize returns for variance reduction (baseline-free variance reduction)
-    if len(returns) > 1:
+    if len(returns) > 2:  # Skip normalization for <=2 points (produces pure noise)
         returns = (returns - returns.mean()) / (returns.std() + 1e-8)
 
     # Get Gaussian distribution and compute log-probability of taken actions

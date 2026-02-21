@@ -289,25 +289,40 @@ def train_reinforce(queue,
                 raise Exception("MAX TIME-STEPS EXCEEDED!")
 
         # Track output distribution stats (once per episode, after all timesteps)
-        episode_avg_output_values = actions[:, :timestep, :].mean(dim=(0, 1))
+        episode_avg_output_values = actions[:, :timestep+1, :].mean(dim=(0, 1))
         avg_output_values.append((episode_avg_output_values.tolist(), i,
                                   aggregation_num, zone_index, main_seed))
 
         if train_model:
             st = time.time()
-            # Always train on all cars' data. When agent_by_zone=True, the shared
-            # network learns from every car's experience (not just car 0).
-            # This matches DQN's behavior which iterates range(num_cars).
-            num_train = num_cars
-            for agent_ind in range(num_train):
-                experiences = (states[agent_ind, :timestep], actions[agent_ind, :timestep], rewards[agent_ind, :timestep], dones[agent_ind, :timestep])
+            t = timestep + 1  # off-by-one fix: include data stored at index `timestep`
 
-                if agent_by_zone:
-                    agent_learn(experiences, discount_factor, policy_networks[0],\
+            if agent_by_zone:
+                # Batch ALL cars' trajectories for one stable gradient update
+                # (instead of 100 sequential tiny updates that conflict with each other)
+                all_states, all_actions, all_rewards, all_dones = [], [], [], []
+                for agent_ind in range(num_cars):
+                    if t > 0:
+                        all_states.append(states[agent_ind, :t])
+                        all_actions.append(actions[agent_ind, :t])
+                        all_rewards.append(rewards[agent_ind, :t])
+                        all_dones.append(dones[agent_ind, :t])
+                if all_states:
+                    batched = (
+                        torch.cat(all_states, dim=0),
+                        torch.cat(all_actions, dim=0),
+                        torch.cat(all_rewards, dim=0),
+                        torch.cat(all_dones, dim=0),
+                    )
+                    agent_learn(batched, discount_factor, policy_networks[0],
                                 optimizers[0], device)
-                else:
-                    agent_learn(experiences, discount_factor, policy_networks[agent_ind],\
-                                optimizers[agent_ind], device)
+            else:
+                for agent_ind in range(num_cars):
+                    if t > 0:
+                        experiences = (states[agent_ind, :t], actions[agent_ind, :t],
+                                       rewards[agent_ind, :t], dones[agent_ind, :t])
+                        agent_learn(experiences, discount_factor, policy_networks[agent_ind],
+                                    optimizers[agent_ind], device)
 
             if verbose:
                 print_et(f'Spent training', st)
