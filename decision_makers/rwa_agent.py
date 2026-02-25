@@ -113,8 +113,12 @@ class RWANetwork(nn.Module):
         backbone_out = self.backbone(state)  # (B, backbone_dim)
 
         # --- Parse and embed charger tokens ---
+        # State layout is [t0, t1, ..., tN, d0, d1, ..., dN, global_context]
+        # (all traffic values first, then all distances — NOT interleaved)
         num_t = self.num_charger_tokens
-        charger_features = state[:, :num_t * 2].reshape(batch_size, num_t, 2)
+        traffic = state[:, :num_t]                    # (B, num_legs)
+        distances = state[:, num_t:num_t * 2]         # (B, num_legs)
+        charger_features = torch.stack([traffic, distances], dim=-1)  # (B, num_legs, 2)
         charger_tokens = self.charger_embed(charger_features)  # (B, N, backbone_dim)
 
         # --- Cross-attention: backbone queries charger tokens ---

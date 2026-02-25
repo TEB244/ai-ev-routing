@@ -112,7 +112,7 @@ Constructed in `environment_main.py:1052`. Formula: `state_dim = (num_chargers *
 
 | Component | Dimensions | Description |
 |-----------|-----------|-------------|
-| Charger features | `num_chargers * 3 * 2` | Interleaved `[traffic_0, dist_0, traffic_1, dist_1, ...]` per charger-leg |
+| Charger features | `num_chargers * 3 * 2` | Contiguous `[traffic_0, traffic_1, ..., dist_0, dist_1, ...]` (all traffic then all distances) |
 | Global context | 6 | `[num_chargers*3, route_dist, num_cars, model_index, temperature, timestep]` |
 
 With `num_chargers=1`: state_dim = 12 (6 charger + 6 global)
