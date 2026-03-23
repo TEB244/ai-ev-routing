@@ -1,0 +1,12 @@
+
+### Experiment 10001: ###
+--------------------------------
+Seed: 1234
+Model: REINFORCE
+Season: spring
+Number of cars: 25
+Number of chargers: 1
+Number of episodes: 50
+Number of aggregations: 10
+Average rewards when training: False
+Note: Smaller version of Exp_4036 (REINFORCE) for fast testing.

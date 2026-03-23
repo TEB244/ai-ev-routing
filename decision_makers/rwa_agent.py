@@ -36,24 +36,30 @@ class TransformerBlock(nn.Module):
 
 class RWANetwork(nn.Module):
     """
-    Hybrid MLP + Cross-Attention policy network for the RWA (RL with Attention) algorithm.
+    Hybrid MLP + Per-Charger Cross-Attention policy network for the RWA algorithm.
 
-    Architecture (v3):
+    Architecture (v4 - per-charger queries):
         1. MLP backbone processes the FULL state vector (same as REINFORCE) to guarantee
            a learning floor — the network can learn at least as well as a plain MLP.
-        2. Cross-attention: the backbone's learned representation queries per-charger tokens
-           (traffic, distance) to identify which charger routes matter most.
-        3. Fusion: backbone output and attention output are concatenated and fed to a
-           policy head that produces action means (raw logits) for a Gaussian policy.
+        2. Per-charger learned queries cross-attend to charger-leg tokens. Each physical
+           charger gets its own query conditioned on the backbone output, producing a
+           charger-specific attended representation. This allows the attention to learn
+           different patterns for different chargers (e.g., "charger A should attend to
+           nearby alternatives" vs "charger B should attend to low-traffic options").
+        3. Shared per-charger head maps each charger's attended output to 3 action dims
+           (the routing weights for that charger's 3 legs).
+        4. Backbone produces a global action prediction (learning floor). Attention output
+           is added as a gated residual — preserving the MLP learning floor while allowing
+           attention to provide structured per-charger adjustments.
 
     The action space is continuous [0,1] per charger-leg dimension. Sigmoid is applied
     externally (in the training loop) to map logits to [0,1] for the environment.
     A learnable log-standard-deviation parameter controls exploration.
 
     This design ensures:
-        - Guaranteed learning (MLP backbone works even if attention contributes nothing)
-        - Attention benefit grows with more chargers (more tokens = richer attention)
-        - Research contribution preserved: "attention enhances RL routing decisions"
+        - Guaranteed learning (backbone_head works even if attention contributes nothing)
+        - Per-charger attention produces action-specific representations (not one global summary)
+        - Attention benefit grows with more chargers (more tokens + more queries)
     """
     def __init__(self, state_dim, action_dim, layers, embed_dim=64, num_heads=4,
                  attention_dropout=0.0, num_transformer_layers=1):
@@ -62,18 +68,28 @@ class RWANetwork(nn.Module):
         self.state_dim = state_dim
         self.action_dim = action_dim
         self.num_charger_tokens = (state_dim - 6) // 2  # Number of charger-leg tokens
+        self.num_physical_chargers = action_dim // 3     # Number of physical chargers
 
         # --- MLP backbone (processes full state, same structure as REINFORCE) ---
         self.backbone = nn.Sequential(
-            nn.Linear(state_dim, layers[0]),    # 12 → 128
+            nn.Linear(state_dim, layers[0]),
             nn.ReLU(),
-            nn.Linear(layers[0], layers[1]),    # 128 → 64
+            nn.Linear(layers[0], layers[1]),
             nn.ReLU(),
         )
-        backbone_dim = layers[1]  # 64
+        backbone_dim = layers[1]
+        self.backbone_dim = backbone_dim
 
-        # --- Charger token cross-attention ---
-        self.charger_embed = nn.Linear(2, backbone_dim)   # Per-charger (traffic, distance) → backbone_dim
+        # --- Charger token embedding ---
+        self.charger_embed = nn.Linear(2, backbone_dim)
+
+        # --- Per-charger learned queries ---
+        self.query_tokens = nn.Parameter(
+            torch.randn(self.num_physical_chargers, backbone_dim) * 0.02
+        )
+        self.query_context = nn.Linear(backbone_dim, backbone_dim)
+
+        # --- Cross-attention ---
         self.cross_attn = nn.MultiheadAttention(
             embed_dim=backbone_dim,
             num_heads=num_heads,
@@ -82,19 +98,29 @@ class RWANetwork(nn.Module):
         )
         self.attn_ln = nn.LayerNorm(backbone_dim)
 
-        # --- Policy head (fuses backbone + attention) → raw logits ---
-        self.policy_head = nn.Sequential(
-            nn.Linear(backbone_dim * 2, layers[1]),  # 128 → 64
+        # --- Per-charger action head (shared weights across chargers) ---
+        self.per_charger_head = nn.Sequential(
+            nn.Linear(backbone_dim, backbone_dim),
             nn.ReLU(),
-            nn.Linear(layers[1], action_dim),         # 64 → 3
+            nn.Linear(backbone_dim, 3),
         )
 
+        # --- Backbone global action prediction (learning floor, like REINFORCE) ---
+        self.backbone_head = nn.Sequential(
+            nn.Linear(backbone_dim, layers[-1]),
+            nn.ReLU(),
+            nn.Linear(layers[-1], action_dim),
+        )
+
+        # --- Learnable gate for attention contribution ---
+        self.gate = nn.Parameter(torch.tensor(0.0))  # sigmoid(0) = 0.5 initially
+
         # Learnable log-standard-deviation for the Gaussian policy (one per action dim)
-        self.log_std = nn.Parameter(torch.full((action_dim,), -0.5))  # std≈0.6 instead of 1.0 for less initial noise
+        self.log_std = nn.Parameter(torch.full((action_dim,), -0.5))
 
     def forward(self, state):
         """
-        Forward pass through the hybrid MLP + cross-attention network.
+        Forward pass through the hybrid MLP + per-charger cross-attention network.
 
         Parameters:
             state (torch.Tensor): Input state tensor of shape (state_dim,) or (batch, state_dim).
@@ -119,16 +145,28 @@ class RWANetwork(nn.Module):
         traffic = state[:, :num_t]                    # (B, num_legs)
         distances = state[:, num_t:num_t * 2]         # (B, num_legs)
         charger_features = torch.stack([traffic, distances], dim=-1)  # (B, num_legs, 2)
-        charger_tokens = self.charger_embed(charger_features)  # (B, N, backbone_dim)
+        charger_tokens = self.charger_embed(charger_features)  # (B, N_legs, backbone_dim)
 
-        # --- Cross-attention: backbone queries charger tokens ---
-        query = backbone_out.unsqueeze(1)  # (B, 1, backbone_dim)
-        attn_out, _ = self.cross_attn(query, charger_tokens, charger_tokens)  # (B, 1, backbone_dim)
-        attn_out = self.attn_ln(attn_out.squeeze(1))  # (B, backbone_dim)
+        # --- Per-charger queries conditioned on backbone ---
+        context = self.query_context(backbone_out).unsqueeze(1)  # (B, 1, backbone_dim)
+        queries = self.query_tokens.unsqueeze(0).expand(batch_size, -1, -1) + context
+        # queries: (B, num_physical_chargers, backbone_dim)
 
-        # --- Fuse backbone + attention and produce action means (raw logits) ---
-        fused = torch.cat([backbone_out, attn_out], dim=-1)  # (B, backbone_dim * 2)
-        mean = self.policy_head(fused)  # Raw logits, no softmax
+        # --- Cross-attention: per-charger queries attend to all charger-leg tokens ---
+        attn_out, _ = self.cross_attn(queries, charger_tokens, charger_tokens)
+        # attn_out: (B, num_physical_chargers, backbone_dim)
+        attn_out = self.attn_ln(attn_out)
+
+        # --- Per-charger actions from attention ---
+        per_charger_action = self.per_charger_head(attn_out)  # (B, num_physical_chargers, 3)
+        attn_action = per_charger_action.reshape(batch_size, -1)  # (B, action_dim)
+
+        # --- Backbone global action prediction ---
+        backbone_action = self.backbone_head(backbone_out)  # (B, action_dim)
+
+        # --- Gated residual fusion ---
+        gate = torch.sigmoid(self.gate)
+        mean = backbone_action + gate * attn_action
 
         if squeezed:
             mean = mean.squeeze(0)

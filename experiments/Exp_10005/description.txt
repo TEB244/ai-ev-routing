@@ -1,0 +1,15 @@
+
+### Experiment 10005: ###
+--------------------------------
+Seed: 1234
+Model: REINFORCE
+Season: spring
+Number of cars: 417
+Number of chargers: 15
+Number of episodes: 500
+Number of aggregations: 75
+Layers: [128, 64, 64]
+Average rewards when training: False
+Note: REINFORCE baseline with 15 chargers and smaller MLP layers.
+      Paired with Exp_10006 (RWA) to test attention advantage at scale.
+      State dim = 96, action dim = 45.

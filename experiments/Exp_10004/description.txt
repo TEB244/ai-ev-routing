@@ -1,0 +1,12 @@
+
+### Experiment 10004: ###
+--------------------------------
+Seed: 1234
+Model: RWA (RL with Attention)
+Season: spring
+Number of cars: 25
+Number of chargers: 1
+Number of episodes: 50
+Number of aggregations: 10
+Average rewards when training: False
+Note: Smaller version of Exp_4180 (RWA) for fast testing.

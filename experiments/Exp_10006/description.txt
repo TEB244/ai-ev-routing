@@ -1,0 +1,17 @@
+
+### Experiment 10006: ###
+--------------------------------
+Seed: 1234
+Model: RWA (RL with Attention) v4 - per-charger queries
+Season: spring
+Number of cars: 417
+Number of chargers: 15
+Number of episodes: 500
+Number of aggregations: 75
+Layers: [128, 64, 64]
+Attention: embed_dim=64, num_heads=4, per-charger learned queries
+Average rewards when training: False
+Note: RWA with per-charger cross-attention queries and gated residual fusion.
+      Paired with Exp_10005 (REINFORCE) to test attention advantage at scale.
+      State dim = 96, action dim = 45. 15 physical charger queries attend to
+      45 charger-leg tokens.
