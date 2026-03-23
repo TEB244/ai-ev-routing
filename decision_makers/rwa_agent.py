@@ -35,6 +35,9 @@ class TransformerBlock(nn.Module):
 
 
 class RWANetwork(nn.Module):
+    LOG_STD_MIN = -2.0  # std floor ≈ 0.135 — prevents deterministic collapse
+    LOG_STD_MAX = 0.5   # std ceiling ≈ 1.65 — prevents excessive noise
+
     """
     Hybrid MLP + Per-Charger Cross-Attention policy network for the RWA algorithm.
 
@@ -113,7 +116,7 @@ class RWANetwork(nn.Module):
         )
 
         # --- Learnable gate for attention contribution ---
-        self.gate = nn.Parameter(torch.tensor(0.0))  # sigmoid(0) = 0.5 initially
+        self.gate = nn.Parameter(torch.tensor(-1.0))  # sigmoid(-1) ≈ 0.27 — let attention earn influence
 
         # Learnable log-standard-deviation for the Gaussian policy (one per action dim)
         self.log_std = nn.Parameter(torch.full((action_dim,), -0.5))
@@ -184,7 +187,8 @@ class RWANetwork(nn.Module):
             torch.distributions.Normal: Gaussian distribution with learned mean and std.
         """
         mean = self.forward(state)
-        std = torch.exp(self.log_std).expand_as(mean)
+        clamped_log_std = torch.clamp(self.log_std, self.LOG_STD_MIN, self.LOG_STD_MAX)
+        std = torch.exp(clamped_log_std).expand_as(mean)
         return torch.distributions.Normal(mean, std)
 
 
@@ -261,7 +265,7 @@ def compute_loss(experiences, gamma, rwa_network):
     entropy = dist.entropy().sum(dim=-1)
 
     # REINFORCE loss: -(log_prob * return) with entropy bonus
-    loss = -(log_probs * returns).mean() - 0.01 * entropy.mean()
+    loss = -(log_probs * returns).mean() - 0.02 * entropy.mean()
 
     return loss
 
@@ -324,7 +328,8 @@ def get_actions(state, rwa_networks, episode_index, agent_index, device, epsilon
         if random_threshold[episode_index, agent_index] < epsilon:
             # Exploration: sample from policy with extra noise for broader search
             dist = net.get_distribution(state)
-            explore_std = torch.exp(net.log_std) + 0.5  # Augmented standard deviation
+            clamped_log_std = torch.clamp(net.log_std, net.LOG_STD_MIN, net.LOG_STD_MAX)
+            explore_std = torch.exp(clamped_log_std) + 0.5  # Augmented standard deviation
             explore_dist = torch.distributions.Normal(dist.loc, explore_std)
             action = explore_dist.sample()
         else:

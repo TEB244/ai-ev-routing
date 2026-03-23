@@ -1,0 +1,17 @@
+
+### Experiment 10007: ###
+--------------------------------
+Seed: 1234
+Model: REINFORCE
+Season: spring
+Number of cars: 417
+Number of chargers: 15
+Number of episodes: 500
+Number of aggregations: 75
+Layers: [128, 64, 64]
+Average rewards when training: False
+Note: Re-run of Exp_10005 with training stability fixes applied:
+      - log_std clamped to [-2.0, 0.5] to prevent policy collapse
+      - Entropy coefficient increased from 0.01 to 0.02
+      - Epsilon floor raised from 0.01 to 0.05
+      Paired with Exp_10008 (RWA) to verify fixes and test attention advantage.

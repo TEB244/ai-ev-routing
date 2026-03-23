@@ -1,0 +1,19 @@
+
+### Experiment 10008: ###
+--------------------------------
+Seed: 1234
+Model: RWA
+Season: spring
+Number of cars: 417
+Number of chargers: 15
+Number of episodes: 500
+Number of aggregations: 75
+Layers: [128, 64, 64]
+Average rewards when training: False
+Note: Re-run of Exp_10006 with training stability fixes applied:
+      - log_std clamped to [-2.0, 0.5] to prevent policy collapse
+      - Entropy coefficient increased from 0.01 to 0.02
+      - Epsilon floor raised from 0.01 to 0.05
+      - Gate initialization lowered from 0.0 to -1.0 (sigmoid ≈ 0.27)
+        to let MLP backbone dominate early while attention earns influence.
+      Paired with Exp_10007 (REINFORCE) to verify fixes and test attention advantage.

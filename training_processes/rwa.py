@@ -331,7 +331,7 @@ def train_rwa(queue,
 
         epsilon *= epsilon_decay
         if train_model:
-            epsilon = max(0.01, epsilon)  # Lowered from 0.1 for on-policy methods
+            epsilon = max(0.05, epsilon)  # Minimal exploration threshold for on-policy methods
 
         avg_reward = episode_rewards.sum(axis=0).mean()
         avg_rewards.append((avg_reward, aggregation_num, zone_index, main_seed))

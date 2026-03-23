@@ -14,6 +14,9 @@ class PolicyNetwork(nn.Module):
     independently controls the distance vs. traffic tradeoff weight for graph reweighting.
     Sigmoid is applied externally (in the training loop) to map logits to [0,1] for the environment.
     """
+    LOG_STD_MIN = -2.0  # std floor ≈ 0.135 — prevents deterministic collapse
+    LOG_STD_MAX = 0.5   # std ceiling ≈ 1.65 — prevents excessive noise
+
     def __init__(self, state_dim, action_dim, layers):
         super(PolicyNetwork, self).__init__()
 
@@ -50,7 +53,8 @@ class PolicyNetwork(nn.Module):
             torch.distributions.Normal: Gaussian distribution with learned mean and std.
         """
         mean = self.forward(state)
-        std = torch.exp(self.log_std).expand_as(mean)
+        clamped_log_std = torch.clamp(self.log_std, self.LOG_STD_MIN, self.LOG_STD_MAX)
+        std = torch.exp(clamped_log_std).expand_as(mean)
         return torch.distributions.Normal(mean, std)
 
 def initialize(state_dim, action_dim, layers, device_agents):
@@ -113,7 +117,7 @@ def compute_loss(experiences, gamma, policy_network):
     entropy = dist.entropy().sum(dim=-1)
 
     # REINFORCE loss: -(log_prob * return) with entropy bonus
-    loss = -(log_probs * returns).mean() - 0.01 * entropy.mean()
+    loss = -(log_probs * returns).mean() - 0.02 * entropy.mean()
     return loss
 
 def agent_learn(experiences, gamma, policy_network, optimizer, device):
@@ -175,7 +179,8 @@ def get_actions(state, policy_networks, episode_index, agent_index, device, epsi
         if random_threshold[episode_index, agent_index] < epsilon:
             # Exploration: sample from policy with extra noise for broader search
             dist = net.get_distribution(state)
-            explore_std = torch.exp(net.log_std) + 0.5  # Augmented standard deviation
+            clamped_log_std = torch.clamp(net.log_std, net.LOG_STD_MIN, net.LOG_STD_MAX)
+            explore_std = torch.exp(clamped_log_std) + 0.5  # Augmented standard deviation
             explore_dist = torch.distributions.Normal(dist.loc, explore_std)
             action = explore_dist.sample()
         else:
