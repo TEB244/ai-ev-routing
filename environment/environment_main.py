@@ -262,6 +262,24 @@ class EnvironmentClass:
         self.traffic_scale = config['traffic_scale'] if 'traffic_scale' in config else 1
         self.energy_scale = config['energy_scale'] if 'energy_scale' in config else 0.001
 
+        # Tunable per-term weights applied on top of the unit-conversion scales.
+        # Reward = -(w_d * (D * f_d) + w_T * (T * f_t) + w_e * (E * f_e)),
+        # where f_* are the *_scale unit-conversion factors above and w_* are
+        # the *_weight coefficients below. Defaults to 1.0 for backward
+        # compatibility with prior experiments.
+        self.distance_weight = config['distance_weight'] if 'distance_weight' in config else 1.0
+        self.traffic_weight = config['traffic_weight'] if 'traffic_weight' in config else 1.0
+        self.energy_weight = config['energy_weight'] if 'energy_weight' in config else 1.0
+
+        # Running totals of unscaled reward components for sensitivity-analysis logging
+        self.raw_d_sum = 0.0
+        self.raw_T_sum = 0.0
+        self.raw_E_sum = 0.0
+        self.raw_episode_count = 0
+        self.raw_d_episode = 0.0
+        self.raw_T_episode = 0.0
+        self.raw_E_episode = 0.0
+
         self.action_space = self.num_chargers * 3
         self.observation_space = self.state_dim
 
@@ -739,10 +757,18 @@ class EnvironmentClass:
                 done = True
 
         
-        # Calculate reward as -(distance * 100 + peak traffic + energy used / 100)
-        distance_factor = distances_per_car[-1] * self.distance_scale
-        peak_traffic = torch.max(traffic_per_charger) * self.traffic_scale
-        energy_used = energy_used * self.energy_scale
+        # Capture unscaled reward components for sensitivity-analysis logging
+        raw_distance = distances_per_car[-1]
+        raw_peak_traffic = torch.max(traffic_per_charger)
+        raw_energy = energy_used.clone()
+        self.raw_d_episode += float(raw_distance.mean().item())
+        self.raw_T_episode += float(raw_peak_traffic.item())
+        self.raw_E_episode += float(raw_energy.mean().item())
+
+        # Reward components: each term is (raw value * unit-conversion scale * tunable weight)
+        distance_factor = self.distance_weight * raw_distance * self.distance_scale
+        peak_traffic = self.traffic_weight * raw_peak_traffic * self.traffic_scale
+        energy_used = self.energy_weight * raw_energy * self.energy_scale
         
         # Note that by doing (* 100) and (/ 100) we are scaling each factor of the reward to be around 0-10 on average
         reward_scale = (self.timestep + 1) if self.reward_version == 2 else 1
@@ -875,6 +901,23 @@ class EnvironmentClass:
                 self.duration[agent_idx] += np.where(duration_agent.T == duration_agent[-1])[0][0]
             
             if self.done:
+                self.raw_d_sum += self.raw_d_episode
+                self.raw_T_sum += self.raw_T_episode
+                self.raw_E_sum += self.raw_E_episode
+                self.raw_episode_count += 1
+                avg_d = self.raw_d_sum / self.raw_episode_count
+                avg_T = self.raw_T_sum / self.raw_episode_count
+                avg_E = self.raw_E_sum / self.raw_episode_count
+                print(
+                    f"[REWARD_COMPONENTS] zone={self.zone_idx} "
+                    f"agg={self.aggregation_num} ep={self.episode} "
+                    f"n={self.raw_episode_count} | "
+                    f"raw_d={avg_d:.6f} (alpha_d*d={avg_d*self.distance_scale:.4f}) | "
+                    f"raw_T={avg_T:.4f} (alpha_T*T={avg_T*self.traffic_scale:.4f}) | "
+                    f"raw_E={avg_E:.4f} (alpha_E*E={avg_E*self.energy_scale:.4f})",
+                    flush=True,
+                )
+
                 station_data = np.array([(self.aggregation_num,
                                         self.zone_idx,
                                         self.episode,
@@ -1136,6 +1179,9 @@ class EnvironmentClass:
         self.energy_episode = []
         self.reward_episode = np.zeros(self.num_cars)
         self.duration = np.zeros(self.num_cars)
+        self.raw_d_episode = 0.0
+        self.raw_T_episode = 0.0
+        self.raw_E_episode = 0.0
 
         traffic = np.zeros(shape=(unique_chargers.shape[0], 2))
         traffic[:, 0] = unique_chargers['id']
