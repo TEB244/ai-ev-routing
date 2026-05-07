@@ -1,0 +1,24 @@
+
+### Experiment 7175: ###
+--------------------------------
+Seed: 5555
+Model: ODT
+Season: spring
+Number of cars: 100
+Number of chargers: 1
+Number of episodes: 80
+Number of aggregations: 50
+Average rewards when training: False
+
+Sensitivity sweep variable: energy_weight
+Sensitivity sweep value:    7
+
+Weights (tunable, swept):
+  distance_weight: 1.0
+  traffic_weight:  1.0
+  energy_weight:   7.0
+
+Unit-conversion scales (held at baseline):
+  distance_scale: 100.0
+  traffic_scale:  1.0
+  energy_scale:   0.001
