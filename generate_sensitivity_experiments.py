@@ -165,6 +165,8 @@ python main.py  -e {exp_num} -d "{SCRATCH_PATH[model]}" -eval True
 
 
 def _reinforce_train(exp_num: int, model: str) -> str:
+    # Wall time bumped from the 4036 template's 02:00:00 to 16:00:00 after
+    # observing TIMEOUTs on narval at 2h with the full 10k-episode config.
     return f"""#!/bin/bash
 #SBATCH --job-name=Exp_{exp_num}_train
 #SBATCH --output=experiments/Exp_{exp_num}/output.log
@@ -172,7 +174,7 @@ def _reinforce_train(exp_num: int, model: str) -> str:
 #SBATCH -A def-mcapretz
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=6
-#SBATCH --time=02:00:00
+#SBATCH --time=16:00:00
 #SBATCH --mem=6G
 
 
