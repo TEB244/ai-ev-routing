@@ -105,7 +105,7 @@ class Experiment:
             load_zone = self.zone_index
     
         # Locate the dataset file
-        data_dir = self.odt_config['dataset_path']
+        data_dir = self.odt_config['offline_dataset_path']
         dataset_path = os.path.join(data_dir, f"data_zone_{load_zone}.h5")
     
         # fallback to drac path
@@ -188,7 +188,7 @@ class Experiment:
 
         offline_iter = 0
         print("\n\n\n*** Offline Training ***")
-        self.tracker = CarbonTracker(epochs=(self.odt_config["max_offline_iters"] + self.odt_config["max_online_iters"]), epochs_before_pred=0, monitor_epochs=-1, update_interval=1, verbose=0, ignore_errors=True)
+        self.tracker = CarbonTracker(epochs=(self.odt_config["max_pretrain_iters"] + self.odt_config["max_online_iters"]), epochs_before_pred=0, monitor_epochs=-1, update_interval=1, verbose=0, ignore_errors=True)
         eval_fns = [
             create_vec_eval_episodes_fn(
                 queue=self.queue,
@@ -223,12 +223,12 @@ class Experiment:
         writer = (
             SummaryWriter(self.logger.log_path)
         )
-        while offline_iter < self.odt_config["max_offline_iters"]:
+        while offline_iter < self.odt_config["max_pretrain_iters"]:
             self.tracker.epoch_start() # Start tracking carbon emissions
             self.environment.init_sim(self.aggregation_num)
             dataloader = create_dataloader(
                 trajectories=trajectories,
-                num_iters=self.odt_config["num_updates_per_offline_iter"],
+                num_iters=self.odt_config["num_updates_per_pretrain_iter"],
                 batch_size=self.odt_config["batch_size"],
                 max_len=self.odt_config["K"],
                 state_dim=self.environment.state_dim,
