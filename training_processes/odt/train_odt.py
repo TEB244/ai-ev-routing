@@ -299,6 +299,8 @@ class Experiment:
         if self.aggregation_num > 0:
             self.odt_config["max_offline_iters"] = 0 #For logging purposes
             self.tracker = CarbonTracker(epochs=self.odt_config["max_online_iters"], epochs_before_pred=0, monitor_epochs=-1, update_interval=1, verbose=0, ignore_errors=True)
+        else:
+            self.odt_config["max_offline_iters"] = self.odt_config["max_pretrain_iters"]
         
         #Builds persistent online dataset/replay buffer only updated with online experiences
         transform = TransformSamplingSubTraj(
