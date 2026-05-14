@@ -362,8 +362,9 @@ def main_loop(args):
 
                         total_model_size_kb += sum(t.numel() * t.element_size() for t in tensors)
 
-                if algorithm_dm == 'MPC':
-                    total_model_size_kb = 0
+                if algorithm_dm in ('MPC', 'ODT'):
+                    if algorithm_dm == 'MPC':
+                        total_model_size_kb = 0
                 #For state_dicts
                 else:
                     for i, weight_group in enumerate(local_weights_list):
@@ -559,18 +560,30 @@ def main_loop(args):
                 rewards = []
 
                 print("Join Weights")
-                
+
                 total_model_size_kb = 0
 
-                for i, weight_group in enumerate(local_weights_list):
-                    if weight_group is not None:
-                        for state_dict in weight_group:   # loop inside the inner list
-                            model_size = sum(
-                                p.numel() * p.element_size()
-                                for p in state_dict.values()
-                            )
-                            total_model_size_kb += model_size
-                        
+                if algorithm_dm == 'ODT':
+                    for weight_group in local_weights_list:
+                        if weight_group is None:
+                            continue
+                        if isinstance(weight_group, torch.Tensor):
+                            tensors = [weight_group]
+                        elif isinstance(weight_group, (list, tuple)):
+                            tensors = [t for t in weight_group if isinstance(t, torch.Tensor)]
+                        else:
+                            continue
+                        total_model_size_kb += sum(t.numel() * t.element_size() for t in tensors)
+                elif algorithm_dm != 'MPC':
+                    for i, weight_group in enumerate(local_weights_list):
+                        if weight_group is not None:
+                            for state_dict in weight_group:   # loop inside the inner list
+                                model_size = sum(
+                                    p.numel() * p.element_size()
+                                    for p in state_dict.values()
+                                )
+                                total_model_size_kb += model_size
+
                 queue.put({
                     'tag': 'sustainability_aggregation',
                     'model_size_kb': total_model_size_kb / 1024,
