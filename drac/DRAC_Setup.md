@@ -151,33 +151,79 @@ cd ~
 cd ../../storage_1/metrics
 ```
 
+> **A note on usernames.** Your DRAC username (e.g. `hartman`) and your Huron
+> lab-server username (e.g. `lhartman`) may differ. In the commands below,
+> `<drac_username>` is the account used to SSH into the cluster and
+> `<huron_username>` is the local Huron account that should own the pulled
+> files. Files are pulled into the lab's shared `share_verde` group so other
+> lab members can read them.
+
 ### 2. Retrieve metrics data
-Use the following command to copy the results from DRAC to the current directory:
+Use the following command to copy the results from DRAC to the current
+directory. The `--chown` and `--chmod` flags ensure each file/dir lands
+under the `share_verde` group with group rwX permissions and the setgid
+bit on directories (so any future file created inside inherits the
+group automatically).
+
+To pull **all** completed experiments (the `Exp_*` wildcard):
 ```
-rsync -av --no-perms --prune-empty-dirs \
+rsync -av --no-perms --no-times --prune-empty-dirs \
+  --chown=<huron_username>:share_verde \
+  --chmod=Dg+rwx,Fg+rw,Dg+s \
   --include='*/' \
   --include='Exp_*/train/**' \
   --exclude='*' \
-  <your_username>@beluga.computecanada.ca:/lustre04/scratch/<your_username>/metrics/ .
+  <drac_username>@narval.alliancecan.ca:~/scratch/metrics/ .
+```
+
+To pull a **single** experiment (e.g. just Exp_7000), narrow the include
+filter:
+```
+rsync -av --no-perms --no-times --prune-empty-dirs \
+  --chown=<huron_username>:share_verde \
+  --chmod=Dg+rwx,Fg+rw,Dg+s \
+  --include='*/' \
+  --include='Exp_7000/train/**' \
+  --exclude='*' \
+  <drac_username>@narval.alliancecan.ca:~/scratch/metrics/ .
+```
+
+Before running for real, do a dry run by adding `-n` (or `--dry-run`)
+to confirm only the expected files would be transferred.
+
+After the copy, verify group ownership is correct:
+```
+find Exp_7000 ! -group share_verde 2>/dev/null    # silent output = all good
+ls -ld Exp_7000 Exp_7000/train                    # expect drwxrws--- lhartman share_verde
 ```
 
 ### 3. Delete empty directories (optional)
 Use the below command if you want to delete empty directories after the transfer:
 ```
-ssh <your_username>@beluga.computecanada.ca 'find /lustre04/scratch/<your_username>/metrics/ -type d -empty -delete'
+ssh <drac_username>@narval.alliancecan.ca 'find ~/scratch/metrics/ -type d -empty -delete'
 ```
 
 ### 4. Retrieve saved models
-Use the following command to copy the saved models from DRAC to the current directory:
+Use the following command to copy the saved models from DRAC to the
+current directory. Same `--chown`/`--chmod` flags so the models also
+land under `share_verde` for the lab.
+
 ```
-rsync -av --ignore-existing --remove-source-files <your_username>@beluga.computecanada.ca:projects/def-mcapretz/<your_username>/rl-for-vrp-csp/saved_networks/ ./
+rsync -av --no-perms --no-times --ignore-existing --remove-source-files \
+  --chown=<huron_username>:share_verde \
+  --chmod=Dg+rwx,Fg+rw,Dg+s \
+  <drac_username>@narval.alliancecan.ca:projects/def-mcapretz/<drac_username>/ai-ev-routing/saved_networks/ ./
 ```
-Note that when using the above command, the files on DRAC that were copied will be deleted, and files that already exist on the lab server will not be copied from the DRAC server.
+Note that when using the above command, the files on DRAC that were
+copied will be deleted (`--remove-source-files`), and files that
+already exist on the lab server will not be re-copied from the DRAC
+server (`--ignore-existing`). Drop `--remove-source-files` if you want
+to keep the DRAC copies for retraining.
 
 ### 5. Delete empty model directories (optional)
 Use the below command if you want to delete empty directories after the transfer:
 ```
-ssh <your_username>@beluga.computecanada.ca 'find projects/def-mcapretz/<your_username>/rl-for-vrp-csp/saved_networks/ -type d -empty -delete'
+ssh <drac_username>@narval.alliancecan.ca 'find projects/def-mcapretz/<drac_username>/ai-ev-routing/saved_networks/ -type d -empty -delete'
 ```
 
 ### 6. Retrieve job stats:
