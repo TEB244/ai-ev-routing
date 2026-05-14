@@ -1,0 +1,27 @@
+
+### Experiment 8006: Bulletproofing - single-term reward ###
+-----------------------------------------------------------------
+Seed: 1234
+Model: DQN
+Season: spring
+Number of cars: 100
+Number of chargers: 1
+Number of episodes: 200
+Number of aggregations: 50
+Average rewards when training: False
+
+Reward shape: energy_only
+  distance_weight: 0.0
+  traffic_weight:  0.0
+  energy_weight:   1.0
+
+Unit-conversion scales (baseline):
+  distance_scale: 100.0
+  traffic_scale:  1.0
+  energy_scale:   0.001
+
+Purpose: test whether agent behaviour shifts under single-term rewards.
+A distance-only-trained agent should drive less; a traffic-only-trained
+agent should pick less congested stations; etc. Confirming this rules
+out the "agent does not optimise the reward" critique that the 7xxx
+invariance result could otherwise invite.
