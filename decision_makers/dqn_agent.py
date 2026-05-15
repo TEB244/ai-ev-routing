@@ -49,41 +49,56 @@ def initialize(state_dim, action_dim, layers, device_agents):
 
 def compute_loss(experiences, gamma, q_network, target_q_network):
     """
-    Computes the loss for training the Q-network when optimizing all outputs in the Q-value distribution.
+    Standard DQN loss: regress Q(s, a) for the action actually taken
+    toward r + gamma * max_a' Q_target(s', a') * (1 - done).
+
+    The stored "actions" are the raw Q-network outputs at action-collection
+    time (the env consumes the sigmoid'd full 3-vector as continuous
+    edge-weights). We take argmax over those stored output vectors as a
+    discrete proxy for "which action was emphasized," and update only the
+    Q-value of that dimension - matching the conventional DQN update where
+    only Q(s, a_taken) is shifted toward the bootstrap target.
+
+    Prior implementation broadcast the target to all action dimensions,
+    which discarded the action information entirely and trained every
+    output to predict the same value - preventing any preference between
+    actions from being learned.
 
     Parameters:
-        experiences (tuple): A tuple containing:
-            - states (torch.tensor): Batch of states.
-            - distributions (torch.tensor): Batch of action distributions.
-            - rewards (torch.tensor): Batch of rewards.
-            - next_states (torch.tensor): Batch of next states.
-            - dones (torch.tensor): Batch of done flags indicating episode termination.
-        gamma (float): Discount factor for future rewards.
-        q_network (QNetwork): Q-network to be trained.
-        target_q_network (QNetwork): Target Q-network used for computing target Q-values.
+        experiences (tuple):
+            - states         (torch.tensor): batch of states, shape (B, state_dim)
+            - action_outputs (torch.tensor): batch of stored Q-net outputs at
+                                             action-collection time, shape (B, action_dim)
+            - rewards        (torch.tensor): batch of rewards, shape (B, 1)
+            - next_states    (torch.tensor): batch of next states, shape (B, state_dim)
+            - dones          (torch.tensor): batch of done flags, shape (B, 1)
+        gamma (float): discount factor for future rewards.
+        q_network (QNetwork): Q-network being trained.
+        target_q_network (QNetwork): Target Q-network for the bootstrap.
 
     Returns:
-        torch.tensor: The computed loss value.
+        torch.tensor: scalar MSE loss.
     """
 
-    states, distributions, rewards, next_states, dones = experiences
+    states, action_outputs, rewards, next_states, dones = experiences
 
-    # Compute current Q-value predictions for all actions
+    # Q-values for every action in the current state (B, action_dim).
     current_Q_values = q_network(states)
 
-    # Compute the next Q-values for all actions from the target network
+    # Bootstrap target: r + gamma * max_a' Q_target(s', a') * (1 - done).
+    # Shape (B, 1) -> (B,).
     with torch.no_grad():
         next_Q_values = target_q_network(next_states)
-        # Get the maximum Q-value for each next state to use for each distribution element
-        max_next_Q_values = next_Q_values.max(1, keepdim=True)[0]  # Max Q-value per next state, shaped as (batch_size, 1)
+        max_next_Q_values = next_Q_values.max(1, keepdim=True)[0]  # (B, 1)
+    target_Q = (rewards + gamma * max_next_Q_values * (1 - dones)).squeeze(1)  # (B,)
 
-    # Compute target Q-values for each output in the distribution
-    # We add (gamma * max_next_Q_values * (1 - dones)) to each element in the distribution to create per-action targets
-    target_Q_values = rewards + (gamma * max_next_Q_values * (1 - dones))
+    # Action selected at collection time: argmax over the stored Q-net output
+    # vector. Sigmoid is monotonic, so argmax(action_outputs) == argmax(sigmoid(action_outputs)).
+    chosen_action_idx = action_outputs.argmax(dim=-1, keepdim=True)        # (B, 1)
+    chosen_Q = current_Q_values.gather(1, chosen_action_idx).squeeze(1)    # (B,)
 
-    # Use a loss that can handle the entire Q-value distribution
-    # Here we use MSE to compare each element in current_Q_values to target_Q_values
-    loss = F.mse_loss(current_Q_values, target_Q_values.expand_as(current_Q_values))
+    # Standard DQN MSE on the chosen action's Q-value only.
+    loss = F.mse_loss(chosen_Q, target_Q)
 
     return loss
 
@@ -108,18 +123,24 @@ def agent_learn(experiences, gamma, q_network, target_q_network, optimizer, devi
         None
     """
 
-    # Convert NumPy arrays to PyTorch tensors
-    states, distributions, rewards, next_states, dones = experiences
-    states = torch.tensor(states, dtype=torch.float32, device=device)
-    distributions = torch.tensor(distributions, dtype=torch.int64, device=device)
-    rewards = torch.tensor(rewards, dtype=torch.float32, device=device).unsqueeze(1)
-    next_states = torch.tensor(next_states, dtype=torch.float32, device=device)
-    dones = torch.tensor(dones, dtype=torch.float32, device=device).unsqueeze(1)
-    experiences = (states, distributions, rewards, next_states, dones)
+    # Convert NumPy arrays / tensors to PyTorch tensors on the right device.
+    # CRITICAL: action_outputs must stay as float32 - the previous int64 cast
+    # truncated the stored Q-value outputs to integers, destroying the action
+    # information that compute_loss now relies on.
+    states, action_outputs, rewards, next_states, dones = experiences
+    states         = torch.as_tensor(states,         dtype=torch.float32, device=device)
+    action_outputs = torch.as_tensor(action_outputs, dtype=torch.float32, device=device)
+    rewards        = torch.as_tensor(rewards,        dtype=torch.float32, device=device).unsqueeze(1)
+    next_states    = torch.as_tensor(next_states,    dtype=torch.float32, device=device)
+    dones          = torch.as_tensor(dones,          dtype=torch.float32, device=device).unsqueeze(1)
+    experiences    = (states, action_outputs, rewards, next_states, dones)
 
     loss = compute_loss(experiences, gamma, q_network, target_q_network)  # Compute loss
     optimizer.zero_grad()  # Zero out gradients
     loss.backward()  # Backpropagate loss
+    # Gradient clipping prevents pathological updates when bootstrap targets
+    # are large in magnitude (rewards are in [-700, -40] for this env).
+    torch.nn.utils.clip_grad_norm_(q_network.parameters(), max_norm=10.0)
     optimizer.step()  # Update weights
 
 def get_actions(state, q_networks, random_threshold, epsilon, episode_index, agent_index, device, nn_by_zone):

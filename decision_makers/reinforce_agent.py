@@ -49,26 +49,37 @@ def initialize(state_dim, action_dim, layers, device_agents):
 
 def compute_loss(experiences, gamma, policy_network):
     """
-    Computes the loss for the REINFORCE agent by multiplying the log probability of each taken action
-    by the discounted return.
+    REINFORCE loss with two standard variance-reduction tweaks:
+
+    1. **Baseline subtraction**: subtract the batch mean from the discounted
+       returns so the gradient is driven by the *advantage* (how much better
+       than typical this action was) rather than absolute return magnitude.
+       Without this, the per-episode rewards in [-700, -40] dominate the
+       gradient regardless of which action was selected, masking the
+       per-action learning signal.
+
+    2. **Numerical safety on log**: clamp the chosen probability so that a
+       saturated softmax (prob -> 0) does not produce log(0) = -inf and
+       poison the gradient.
 
     Parameters:
-        experiences (tuple): A tuple containing:
-            - states (torch.tensor): Batch of states.
-            - actions (torch.tensor): Batch of actions (or action distributions).
-            - rewards (torch.tensor): Batch of rewards.
-            - next_states (torch.tensor): Batch of next states (not used in REINFORCE).
-            - dones (torch.tensor): Batch of done flags indicating episode termination.
-        gamma (float): Discount factor for future rewards.
-        policy_network (PolicyNetwork): The policy network to be trained.
+        experiences (tuple):
+            - states  (torch.tensor): batch of states.
+            - actions (torch.tensor): batch of stored action probability
+                                       vectors (output of the policy at
+                                       action-collection time).
+            - rewards (torch.tensor): batch of rewards.
+            - dones   (torch.tensor): batch of done flags.
+        gamma (float): discount factor.
+        policy_network (PolicyNetwork): policy being trained.
 
     Returns:
-        torch.tensor: The computed policy gradient loss value.
+        torch.tensor: scalar policy-gradient loss.
     """
 
     states, actions, rewards, dones = experiences
 
-    # Compute discounted returns for each time step
+    # Discounted returns (Monte Carlo).
     returns = []
     G = 0
     for r, done in zip(reversed(rewards), reversed(dones)):
@@ -76,18 +87,26 @@ def compute_loss(experiences, gamma, policy_network):
         returns.insert(0, G)
     returns = torch.tensor(returns, dtype=torch.float32, device=states.device)
 
-    # Get the policy's probability distribution over actions
+    # Baseline subtraction: use the batch mean as a state-independent baseline.
+    # This is the simplest control variate; it does not change the gradient's
+    # expected value but reduces its variance substantially when rewards are
+    # large and similar across samples.
+    if returns.numel() > 1:
+        returns = returns - returns.mean()
+
+    # Current policy's probability distribution over actions.
     probs = policy_network(states)
 
-    # Convert action distributions to discrete action indices (argmax)
-    # so that gather indices have the correct shape for discrete actions
+    # Action chosen at collection time: argmax over the stored output vector.
     action_indices = torch.argmax(actions, dim=-1)
 
-    # Compute log probabilities for chosen actions
-    log_probs = torch.log(torch.gather(probs, 1, action_indices.unsqueeze(1)).squeeze(1))
+    # Probability of the chosen action, clamped for numerical safety.
+    chosen_probs = torch.gather(probs, 1, action_indices.unsqueeze(1)).squeeze(1)
+    chosen_probs = chosen_probs.clamp(min=1e-8)
+    log_probs = torch.log(chosen_probs)
 
-    # REINFORCE loss: - (log(pi(a|s)) * G)
-    loss = - (log_probs * returns).mean()
+    # REINFORCE: -E[log pi(a|s) * advantage].
+    loss = -(log_probs * returns).mean()
     return loss
 
 def agent_learn(experiences, gamma, policy_network, optimizer, device):
