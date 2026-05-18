@@ -77,6 +77,16 @@ BASELINE_SCALES = {
     "energy_scale": 0.001,
 }
 
+# Hyperparameter overrides applied on top of each cloned 4xxx template.
+# The 4xxx baselines use lr=1e-5 + buffer_limit=150 + discount=0.999, which
+# verified locally does NOT learn under the post-fix code path. Bumped to
+# values that DO learn at 100-car scale.
+NN_HYPERPARAM_OVERRIDES = {
+    "learning_rate":   1.0e-03,
+    "buffer_limit":    1500,
+    "discount_factor": 0.99,
+}
+
 START_EXP = 7000
 
 
@@ -409,6 +419,13 @@ def main():
 
                     # Inject seed
                     cfg["environment_settings"]["seed"] = seed
+
+                    # Override the nn_hyperparameters that govern actual
+                    # learning behaviour (the 4xxx templates use values that
+                    # do not learn under the post-fix code path).
+                    nn_block = cfg.setdefault("nn_hyperparameters", {})
+                    for k, v in NN_HYPERPARAM_OVERRIDES.items():
+                        nn_block[k] = v
 
                     # Always pin the unit-conversion scales at baseline.
                     for k, v in BASELINE_SCALES.items():
