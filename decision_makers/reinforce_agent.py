@@ -79,7 +79,7 @@ def compute_loss(experiences, gamma, policy_network):
 
     states, actions, rewards, dones = experiences
 
-    # Discounted returns (Monte Carlo).
+    # Discounted rewards-to-go (Monte Carlo).
     returns = []
     G = 0
     for r, done in zip(reversed(rewards), reversed(dones)):
@@ -87,12 +87,26 @@ def compute_loss(experiences, gamma, policy_network):
         returns.insert(0, G)
     returns = torch.tensor(returns, dtype=torch.float32, device=states.device)
 
-    # Baseline subtraction: use the batch mean as a state-independent baseline.
-    # This is the simplest control variate; it does not change the gradient's
-    # expected value but reduces its variance substantially when rewards are
-    # large and similar across samples.
-    if returns.numel() > 1:
-        returns = returns - returns.mean()
+    # Baseline: exponential moving average of per-episode mean return,
+    # tracked ACROSS episodes (stored on the policy_network so it persists
+    # across agent_learn calls). Subtracting a within-episode mean (the
+    # previous behaviour) is wrong because rewards-to-go are monotonically
+    # different early vs late in an episode purely because of remaining
+    # timesteps, not because of action quality - it biases gradients toward
+    # rewarding late-episode actions regardless of what they did.
+    current_mean = float(returns.mean().item())
+    ema = getattr(policy_network, '_return_ema', None)
+    if ema is None:
+        policy_network._return_ema = current_mean
+    else:
+        policy_network._return_ema = 0.95 * ema + 0.05 * current_mean
+    advantages = returns - policy_network._return_ema
+
+    # Normalise advantage scale so the gradient magnitude does not depend on
+    # the absolute reward scale (rewards here are in roughly [-200, -50]).
+    adv_std = float(advantages.std().item()) if advantages.numel() > 1 else 1.0
+    if adv_std > 1e-6:
+        advantages = advantages / (adv_std + 1e-6)
 
     # Current policy's probability distribution over actions.
     probs = policy_network(states)
@@ -106,7 +120,7 @@ def compute_loss(experiences, gamma, policy_network):
     log_probs = torch.log(chosen_probs)
 
     # REINFORCE: -E[log pi(a|s) * advantage].
-    loss = -(log_probs * returns).mean()
+    loss = -(log_probs * advantages).mean()
     return loss
 
 def agent_learn(experiences, gamma, policy_network, optimizer, device):
