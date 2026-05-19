@@ -7,6 +7,38 @@ Each experiment directory should contain:
 
 The first 27 experiments are used to determine the number of episodes and aggregations to use in each permutation.
 
+-------------------------------------------------------------------------
+GLOBAL CHANGE: action space (applies to all 4xxx-9xxx experiments)
+-------------------------------------------------------------------------
+The agent's action space is N=5 discrete distance/traffic mix profiles,
+selected per-state by argmax of the policy network's N outputs.
+
+Profile index i corresponds to mix coefficient w_i = i/(N-1), used as
+  distance_mult = 1 - w_i
+  traffic_mult  = w_i
+when reweighting the Dijkstra graph in `environment_main.generate_paths`.
+
+For N=5 the profiles are:
+  0: w=0.00  pure distance      (distance_mult=1.0,  traffic_mult=0.0)
+  1: w=0.25  lean distance      (distance_mult=0.75, traffic_mult=0.25)
+  2: w=0.50  balanced           (distance_mult=0.5,  traffic_mult=0.5)
+  3: w=0.75  lean traffic       (distance_mult=0.25, traffic_mult=0.75)
+  4: w=1.00  pure traffic       (distance_mult=0.0,  traffic_mult=1.0)
+
+The corresponding config field is `environment_settings.action_dim: 5`.
+
+Rationale: the original paper's implementation used 3 continuous
+network outputs as per-node Dijkstra edge weights, which was
+inconsistent with the discrete-action assumptions of DQN and REINFORCE
+losses and prevented those agents from learning. We replaced it with a
+discrete profile selection. The earlier post-fix code used 3 profiles
+(pure-distance / pure-traffic / balanced); this was generalised to 5
+to give the policy finer-grained control while remaining tractable
+under standard discrete-action RL.
+
+-------------------------------------------------------------------------
+
+
 Set Name: Find Plateau DQN [1-9]
 Experiment 1:
 - Model: DQN
