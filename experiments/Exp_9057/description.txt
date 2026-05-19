@@ -1,0 +1,23 @@
+
+### Experiment 9057: HP tuning ###
+--------------------------------------
+Algorithm:  REINFORCE
+Swept HP:   learning_rate
+HP value:   0.01
+HP centre:  0.001  (post-fix default we are calibrating against)
+Seed:       1234
+
+Computational scope:
+  zones:    1   (template had 4)
+  season:   spring
+  RL aggregation count: 25   (template had 50)
+
+Reward weights pinned at recommended baseline:
+  distance_weight: 1.0   traffic_weight: 1.0   energy_weight: 1.0
+Scales pinned at unit-conversion defaults:
+  distance_scale: 100    traffic_scale: 1      energy_scale: 0.001
+
+Purpose: identify the best value for learning_rate for REINFORCE. Combined
+with the other two HP sweeps for REINFORCE, this batch determines the
+HP configuration to use when re-running the main 4xxx/5xxx/6xxx
+experiments.

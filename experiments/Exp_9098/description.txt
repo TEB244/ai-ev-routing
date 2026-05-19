@@ -1,0 +1,23 @@
+
+### Experiment 9098: HP tuning ###
+--------------------------------------
+Algorithm:  CMA
+Swept HP:   initial_sigma
+HP value:   0.1
+HP centre:  0.1  (post-fix default we are calibrating against)
+Seed:       2020
+
+Computational scope:
+  zones:    1   (template had 4)
+  season:   spring
+  RL aggregation count: 25   (template had 50)
+
+Reward weights pinned at recommended baseline:
+  distance_weight: 1.0   traffic_weight: 1.0   energy_weight: 1.0
+Scales pinned at unit-conversion defaults:
+  distance_scale: 100    traffic_scale: 1      energy_scale: 0.001
+
+Purpose: identify the best value for initial_sigma for CMA. Combined
+with the other two HP sweeps for CMA, this batch determines the
+HP configuration to use when re-running the main 4xxx/5xxx/6xxx
+experiments.

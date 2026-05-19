@@ -33,7 +33,7 @@ environment_settings:
   radius: 20
   saving_data_deepness: episode_level
   season: spring
-  seed: 1234
+  seed: 2020
   start_sequence: random
   starting_charge: 6000
   step_size: 0.01
@@ -59,7 +59,7 @@ eval_config:
     Local: /storage_1/merl/metrics//Exp
   verbose: true
 federated_learning_settings:
-  aggregation_count: 5
+  aggregation_count: 25
   city_multiplier: 0.15
   model_multiplier: 0.5
   zone_multiplier: 0.35
@@ -68,7 +68,7 @@ nn_hyperparameters:
   batch_size: 75
   buffer_limit: 1500
   city_multiplier: 0.15
-  discount_factor: 0.999
+  discount_factor: 0.99
   eps_per_save: 100
   epsilon: 1
   epsilon_decay: 0.999
@@ -76,11 +76,11 @@ nn_hyperparameters:
   - 128
   - 64
   - 64
-  learning_rate: 0.001
+  learning_rate: 1.0e-05
   log_std_decay_rate: 0.01
   max_num_timesteps: 300
   model_multiplier: 0.5
-  num_episodes: 100
+  num_episodes: 200
   num_epochs: 10
   zone_multiplier: 0.35
 odt_hyperparameters:
@@ -92,8 +92,8 @@ odt_hyperparameters:
   eval_context_length: 5
   eval_interval: 1
   eval_rtg: -60
-  exp_name: 7003
-  experiment_number: 7003
+  exp_name: 9002
+  experiment_number: 9002
   init_temperature: 0.1
   learning_rate: 0.0001
   log_to_tb: true
