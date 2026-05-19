@@ -280,7 +280,12 @@ class EnvironmentClass:
         self.raw_T_episode = 0.0
         self.raw_E_episode = 0.0
 
-        self.action_space = self.num_chargers * 3
+        # Action space dimensionality is set from config: action_dim is the
+        # number of discrete distance/traffic mix profiles the policy can
+        # select between. action_dim defaults to 5 for backward compatibility
+        # with the standard config; older configs may set it to 3.
+        self.action_dim = int(config.get('action_dim', 5))
+        self.action_space = self.num_chargers * self.action_dim
         self.observation_space = self.state_dim
 
         # Parameters to save data for stations and agents
@@ -1009,29 +1014,32 @@ class EnvironmentClass:
         if preset_path is None: # Reweight the graph based on the distribution provided
             num_nodes_to_update = graph.shape[0] - 2
             if not fixed_attributes:
-                # The agent's `distribution` (sigmoid'd Q-net/policy outputs) is
-                # interpreted as a vote across N discrete *profiles*, one per
-                # action dimension. argmax picks the active profile and that
-                # profile's (distance_mult, traffic_mult) is applied uniformly
-                # to every candidate node.
+                # The agent's `distribution` (Q-net/policy outputs) is
+                # interpreted as a vote across N discrete *mix profiles*
+                # along a 1-D distance/traffic axis. argmax picks the
+                # active profile and the corresponding (distance_mult,
+                # traffic_mult) is applied uniformly to every candidate
+                # node.
                 #
-                # This is a deliberate departure from the prior per-node
-                # continuous weighting. Continuous outputs do not align with
-                # discrete-action DQN (argmax over continuous outputs gives no
-                # clean mapping from `chosen action` to environment behaviour),
-                # which causes DQN to learn collapsed / constant Q-values and
-                # never improve reward. Discrete profile selection makes the
-                # action space a true categorical and lets standard DQN /
-                # policy-gradient updates work.
+                # Profile i corresponds to mix coefficient w_i = i/(N-1):
+                #   distance_mult = 1 - w_i
+                #   traffic_mult  = w_i
+                # so profile 0 = pure distance and profile N-1 = pure
+                # traffic, with the rest evenly spaced in between. For
+                # the standard configuration N=5 this gives:
+                #   {0: pure-d, 1: lean-d, 2: balanced, 3: lean-t, 4: pure-t}
+                #
+                # This generalises the earlier 3-profile fix and avoids
+                # the per-node continuous weighting that does not align
+                # with discrete-action DQN / REINFORCE losses.
+                num_profiles = int(distribution.numel())
                 profile_idx = int(torch.argmax(distribution).item())
-                # Profile 0: pure distance.  Profile 1: pure traffic.
-                # Profile 2 (and any extra dims): balanced 50/50.
-                if profile_idx == 0:
-                    traffic_mult, distance_mult = 0.0, 1.0
-                elif profile_idx == 1:
-                    traffic_mult, distance_mult = 1.0, 0.0
+                if num_profiles <= 1:
+                    w = 0.5
                 else:
-                    traffic_mult, distance_mult = 0.5, 0.5
+                    w = profile_idx / (num_profiles - 1)
+                distance_mult = 1.0 - w
+                traffic_mult  = w
                 traffic_mult_tensor = torch.full((num_nodes_to_update,), traffic_mult,
                                                 device=self.device, dtype=self.dtype)
                 distance_mult_tensor = torch.full((num_nodes_to_update,), distance_mult,
