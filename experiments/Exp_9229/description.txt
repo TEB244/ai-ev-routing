@@ -1,0 +1,24 @@
+
+### Experiment 9229: HP tuning (v2) ###
+-------------------------------------------
+Algorithm:  ODT
+Swept HP:   K
+HP value:   20
+HP centre:  10  (post-fix default we are calibrating against)
+Seed:       5555
+
+Computational scope:
+  zones:    1   (template had 4)
+  season:   spring
+  RL aggregation count: 25   (template had 50)
+
+Reward weights pinned at recommended baseline:
+  distance_weight: 1.0   traffic_weight: 1.0   energy_weight: 1.0
+Scales pinned at unit-conversion defaults:
+  distance_scale: 100    traffic_scale: 1      energy_scale: 0.001
+
+Purpose (v2 batch): cover hyperparameters that the v1 batch
+(Exp_9000-9179) missed but that the RL literature identifies as
+impactful for ODT. Combined with the v1 results, the v2 batch
+determines the full set of HP values to apply when re-running the main
+4xxx/5xxx/6xxx experiments.

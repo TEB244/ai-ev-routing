@@ -91,16 +91,45 @@ cells.append(code(*split_lines("""colors = {
 # 9xxx HP tuning layout - kept in lock-step with
 # generate_hp_tuning_experiments.py
 SEEDS = [1234, 5555, 2020]
-BLOCK_SIZE = 45                # 3 HPs * 5 values * 3 seeds
-N_VALUES = 5
 N_SEEDS  = 3
 
+# Explicit experiment-number layout for both v1 (9000-9179) and v2
+# (9180-9251) batches. Each tuple is (start_exp, algorithm, hp_name,
+# values_list). Within each sweep, ordering is value-major / seed-minor
+# (3 seeds per value).
+EXP_LAYOUT = [
+    # v1 - 9000-9179
+    (9000, 'DQN',       'learning_rate',     [1.0e-5, 1.0e-4, 1.0e-3, 3.0e-3, 1.0e-2]),
+    (9015, 'DQN',       'discount_factor',   [0.90, 0.95, 0.99, 0.995, 0.999]),
+    (9030, 'DQN',       'buffer_limit',      [150, 500, 1500, 5000, 15000]),
+    (9045, 'REINFORCE', 'learning_rate',     [1.0e-5, 1.0e-4, 1.0e-3, 3.0e-3, 1.0e-2]),
+    (9060, 'REINFORCE', 'discount_factor',   [0.90, 0.95, 0.99, 0.995, 0.999]),
+    (9075, 'REINFORCE', 'layers_arch',       [[32, 32], [64, 64], [128, 64, 64], [256, 128, 64], [512, 256, 128, 64]]),
+    (9090, 'CMA',       'initial_sigma',     [0.01, 0.05, 0.10, 0.30, 1.00]),
+    (9105, 'CMA',       'population_dimension', [10, 20, 40, 80, 160]),
+    (9120, 'CMA',       'max_generations',   [50, 100, 200, 400, 800]),
+    (9135, 'ODT',       'learning_rate',     [1.0e-5, 1.0e-4, 1.0e-3, 1.0e-2, 1.0e-1]),
+    (9150, 'ODT',       'embed_dim',         [64, 128, 256, 512, 1024]),
+    (9165, 'ODT',       'n_layer',           [1, 2, 4, 6, 8]),
+    # v2 - 9180-9251 (extension batch covering literature-impactful HPs the v1 sweep missed)
+    (9180, 'DQN',       'target_network_update_frequency', [5, 10, 25, 50, 100]),
+    (9195, 'DQN',       'target_episode_epsilon_frac',     [0.1, 0.2, 0.3, 0.5, 0.7]),
+    (9210, 'DQN',       'learning_rate',     [3.0e-2, 1.0e-1]),    # extension of v1 lr sweep
+    (9216, 'REINFORCE', 'learning_rate',     [3.0e-2, 1.0e-1]),    # extension of v1 lr sweep
+    (9222, 'ODT',       'K',                 [5, 10, 20, 40, 80]),
+    (9237, 'ODT',       'rtg',               [-30, -50, -75, -100, -150]),
+]
+
 # (algorithm, [(hp_name, hp_path_in_config, values, centre)])
+# Each HP's `values` is the union of v1 (9000-9179) and v2 (9180-9251)
+# sweep values when they cover the same HP - the metadata function knows
+# which experiment number maps to which value, but the analysis treats
+# them as one combined sweep.
 HP_BLOCKS = [
     ('DQN', [
         ('learning_rate',
          ('nn_hyperparameters', 'learning_rate'),
-         [1.0e-5, 1.0e-4, 1.0e-3, 3.0e-3, 1.0e-2],
+         [1.0e-5, 1.0e-4, 1.0e-3, 3.0e-3, 1.0e-2, 3.0e-2, 1.0e-1],  # v1 + v2 ext
          1.0e-3),
         ('discount_factor',
          ('nn_hyperparameters', 'discount_factor'),
@@ -110,11 +139,19 @@ HP_BLOCKS = [
          ('nn_hyperparameters', 'buffer_limit'),
          [150, 500, 1500, 5000, 15000],
          1500),
+        ('target_network_update_frequency',
+         ('nn_hyperparameters', 'target_network_update_frequency'),
+         [5, 10, 25, 50, 100],
+         25),
+        ('target_episode_epsilon_frac',
+         ('nn_hyperparameters', 'target_episode_epsilon_frac'),
+         [0.1, 0.2, 0.3, 0.5, 0.7],
+         0.3),
     ]),
     ('REINFORCE', [
         ('learning_rate',
          ('nn_hyperparameters', 'learning_rate'),
-         [1.0e-5, 1.0e-4, 1.0e-3, 3.0e-3, 1.0e-2],
+         [1.0e-5, 1.0e-4, 1.0e-3, 3.0e-3, 1.0e-2, 3.0e-2, 1.0e-1],  # v1 + v2 ext
          1.0e-3),
         ('discount_factor',
          ('nn_hyperparameters', 'discount_factor'),
@@ -152,6 +189,14 @@ HP_BLOCKS = [
          ('odt_hyperparameters', 'n_layer'),
          [1, 2, 4, 6, 8],
          4),
+        ('K',
+         ('odt_hyperparameters', 'K'),
+         [5, 10, 20, 40, 80],
+         10),
+        ('rtg',
+         ('odt_hyperparameters', 'online_rtg'),
+         [-30, -50, -75, -100, -150],
+         -60),
     ]),
 ]
 
@@ -174,19 +219,21 @@ print(f'Metrics root: {METRICS_ROOT}')""")))
 # ============================================================== helpers
 cells.append(md("### Helpers"))
 cells.append(code(*split_lines("""def hp_exp_metadata(exp_num):
-    \"\"\"Return (algorithm, hp_name, value, seed) for a 9xxx experiment.\"\"\"
-    offset = exp_num - START_EXP
-    if not (0 <= offset < 4 * BLOCK_SIZE):
-        raise ValueError(f'Exp_{exp_num} outside 9000-9179 HP-tuning range')
-    block_idx = offset // BLOCK_SIZE
-    within_block = offset % BLOCK_SIZE
-    algo, hps = HP_BLOCKS[block_idx]
-    hp_idx = within_block // (N_VALUES * N_SEEDS)
-    within_hp = within_block % (N_VALUES * N_SEEDS)
-    hp_name, hp_path, values, centre = hps[hp_idx]
-    v_idx = within_hp // N_SEEDS
-    s_idx = within_hp % N_SEEDS
-    return algo, hp_name, values[v_idx], SEEDS[s_idx]
+    \"\"\"Return (algorithm, hp_name, value, seed) for any 9xxx experiment.
+
+    Handles both the v1 batch (9000-9179) and the v2 extension batch
+    (9180-9251). Each entry in EXP_LAYOUT is a sweep starting at
+    `start_exp`, containing `len(values) * 3` experiments (value-major,
+    seed-minor ordering).
+    \"\"\"
+    for start_exp, algo, hp_name, values in EXP_LAYOUT:
+        n_exps = len(values) * N_SEEDS
+        if start_exp <= exp_num < start_exp + n_exps:
+            offset = exp_num - start_exp
+            v_idx = offset // N_SEEDS
+            s_idx = offset % N_SEEDS
+            return algo, hp_name, values[v_idx], SEEDS[s_idx]
+    raise ValueError(f'Exp_{exp_num} not in any HP-tuning sweep range')
 
 
 def exp_paths(exp_num):
@@ -217,7 +264,7 @@ def load_exp(exp_num):
 
 # ============================================================== load
 cells.append(md("### Load all 9xxx HP-tuning experiments"))
-cells.append(code(*split_lines("""ALL_EXPS = list(range(9000, 9180))
+cells.append(code(*split_lines("""ALL_EXPS = list(range(9000, 9252))   # v1 (9000-9179) + v2 (9180-9251)
 loaded = {}
 missing = []
 for n in ALL_EXPS:
