@@ -2,6 +2,8 @@
 """
 Check progress of an experiment based on its saved metrics.
 
+Pure stdlib + pyyaml — no pandas required.
+
 Usage:
     python check_progress.py <experiment_number> [--metrics-root PATH] [--user USER]
 
@@ -21,6 +23,7 @@ time when available.
 """
 
 import argparse
+import csv
 import os
 import subprocess
 import sys
@@ -29,11 +32,10 @@ from datetime import datetime
 from pathlib import Path
 
 try:
-    import pandas as pd
     import yaml
-except ImportError as e:
-    print(f"ERROR: missing dependency: {e}", file=sys.stderr)
-    print("Activate the conda env that has pandas + pyyaml installed.", file=sys.stderr)
+except ImportError:
+    print("ERROR: pyyaml not installed in this Python environment.", file=sys.stderr)
+    print("On DRAC: source ~/envs/merl_env/bin/activate", file=sys.stderr)
     sys.exit(1)
 
 
@@ -142,6 +144,46 @@ def check_slurm_status(exp_num, user=None):
     return None
 
 
+# --------------------------------------------------------------- CSV scanning
+def scan_agent_csv(csv_path):
+    """
+    Single-pass scan of metrics_agent_episode_level.csv. Returns:
+        distinct_pairs : sorted list of (agg, ep) tuples actually seen
+        rewards_per_pair : dict (agg, ep) -> [reward, ...]
+    Pure stdlib; handles files with >1M rows in a few seconds.
+    """
+    distinct = set()
+    rewards_per_pair = {}
+    with open(csv_path, newline="") as f:
+        reader = csv.reader(f)
+        header = next(reader)
+        try:
+            i_agg = header.index("aggregation")
+            i_ep  = header.index("episode")
+            i_rew = header.index("reward")
+        except ValueError as e:
+            raise RuntimeError(f"Missing expected column in {csv_path}: {e}")
+
+        for row in reader:
+            if len(row) <= max(i_agg, i_ep, i_rew):
+                continue
+            try:
+                agg = int(row[i_agg])
+                ep  = int(row[i_ep])
+                rew = float(row[i_rew])
+            except ValueError:
+                continue
+            pair = (agg, ep)
+            distinct.add(pair)
+            rewards_per_pair.setdefault(pair, []).append(rew)
+
+    return sorted(distinct), rewards_per_pair
+
+
+def mean(xs):
+    return sum(xs) / len(xs) if xs else float("nan")
+
+
 # ------------------------------------------------------------------------ main
 def main():
     p = argparse.ArgumentParser(
@@ -202,15 +244,14 @@ def main():
             print(f"  SLURM:    {slurm[0]} (job {slurm[1]}, elapsed {elapsed})")
         return 0
 
-    # Count episodes - usecols keeps memory low for big CSVs
+    # Scan CSV with stdlib only (no pandas)
     try:
-        df = pd.read_csv(agent_csv, usecols=["aggregation", "episode", "reward"])
+        pairs, rewards_per_pair = scan_agent_csv(agent_csv)
     except Exception as e:
         print(f"  ERROR reading {agent_csv}: {e}", file=sys.stderr)
         return 1
 
-    distinct = df[["aggregation", "episode"]].drop_duplicates()
-    actual_eps = len(distinct)
+    actual_eps = len(pairs)
 
     if expected_eps:
         pct = actual_eps / expected_eps * 100
@@ -219,17 +260,17 @@ def main():
         print(f"  Actual:   {actual_eps} episodes")
 
     if actual_eps > 0:
-        last_pair = distinct.sort_values(["aggregation", "episode"]).iloc[-1]
-        last_agg = int(last_pair["aggregation"])
-        last_ep = int(last_pair["episode"])
+        last_agg, last_ep = pairs[-1]
         print(f"  Current:  aggregation {last_agg + 1}/{agg_count}, "
               f"episode {last_ep + 1}/{eps_per_agg}")
 
-        # Last-100-episode mean reward
+        # Last-N-episode mean reward
         n = min(100, actual_eps)
-        tail_pairs = distinct.sort_values(["aggregation", "episode"]).tail(n)
-        tail = df.merge(tail_pairs, on=["aggregation", "episode"])
-        print(f"  Last {n}-ep mean reward: {tail['reward'].mean():+.2f}")
+        tail_pairs = pairs[-n:]
+        tail_rewards = []
+        for pair in tail_pairs:
+            tail_rewards.extend(rewards_per_pair[pair])
+        print(f"  Last {n}-ep mean reward: {mean(tail_rewards):+.2f}")
 
     # CSV freshness
     mtime = agent_csv.stat().st_mtime
