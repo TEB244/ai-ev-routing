@@ -285,10 +285,8 @@ def train_dqn(queue,
 
                 t2 = time.time()
                 if save_offline_data:
-                    #Save state for each car
                     car_traj['observations'].append(state_np)
-                    #Save unmodified action
-                    car_traj['actions'].append(action_values.detach().cpu().numpy().tolist()) 
+                    car_traj['actions'].append(torch.sigmoid(action_values).detach().cpu().numpy().tolist())
                 
                 # Track outputs before the sigmoid application
                 actions[car_idx, timestep] = action_values

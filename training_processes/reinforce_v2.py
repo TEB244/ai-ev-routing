@@ -237,11 +237,10 @@ def train_reinforce(queue,
                 
                 actions[i, car_idx, timestep] = action_probs 
 
-                if save_offline_data:
-                    #Save unmodified action
-                    car_traj['actions'].append(distribution.detach().cpu().numpy().tolist()) 
-
                 distribution = torch.sigmoid(action_probs)
+
+                if save_offline_data:
+                    car_traj['actions'].append(distribution.detach().cpu().numpy().tolist())
                 distributions[i, car_idx, timestep] = distribution 
 
                 environment.generate_paths(distribution, fixed_attributes, car_idx)

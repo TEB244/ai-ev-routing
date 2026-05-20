@@ -55,6 +55,7 @@ class TransformSamplingSubTraj:
         state_std,
         reward_scale,
         action_range,
+        is_offline=False,
     ):
         super().__init__()
         self.max_len = max_len
@@ -64,6 +65,7 @@ class TransformSamplingSubTraj:
         self.state_std = state_std
         self.reward_scale = reward_scale
         self.action_range = action_range
+        self.is_offline = is_offline
 
     def __call__(self, traj):
         si = random.randint(0, traj["rewards"].shape[0] - 1)
@@ -100,6 +102,10 @@ class TransformSamplingSubTraj:
         ss = np.concatenate([np.zeros((self.max_len - tlen, self.state_dim)), ss])
         ss = (ss - self.state_mean) / self.state_std
 
+        if self.is_offline:
+            # Stored actions are env actions in (0,1); convert to tanh space (-1,1)
+            # Do this before padding so zeros remain 0 (interior of tanh domain)
+            aa = 2 * aa - 1
         aa = np.concatenate([np.zeros((self.max_len - tlen, self.act_dim)), aa])
         rr = np.concatenate([np.zeros((self.max_len - tlen, 1)), rr])
         dd = np.concatenate([np.ones((self.max_len - tlen)) * 2, dd])
@@ -112,7 +118,8 @@ class TransformSamplingSubTraj:
         padding_mask = np.concatenate([np.zeros(self.max_len - tlen), np.ones(tlen)])
 
         ss = torch.from_numpy(ss).to(dtype=torch.float32)
-        aa = torch.from_numpy(aa).to(dtype=torch.float32).clamp(*self.action_range)
+        aa = torch.from_numpy(aa).to(dtype=torch.float32)
+        aa = aa.clamp(*self.action_range)
         rr = torch.from_numpy(rr).to(dtype=torch.float32)
         dd = torch.from_numpy(dd).to(dtype=torch.long)
         rtg = torch.from_numpy(rtg).to(dtype=torch.float32)
@@ -135,6 +142,7 @@ def create_dataloader(
     reward_scale,
     action_range,
     num_workers=0,
+    is_offline=False,
 ):
     # total number of subt-rajectories you need to sample
     sample_size = batch_size * num_iters
@@ -148,6 +156,7 @@ def create_dataloader(
         state_std=state_std,
         reward_scale=reward_scale,
         action_range=action_range,
+        is_offline=is_offline,
     )
 
     subset = SubTrajectory(trajectories, sampling_ind=sampling_ind, transform=transform)
