@@ -1,0 +1,25 @@
+{
+  "DQN": {
+    "nn_hyperparameters": {
+      "learning_rate": 0.01,
+      "discount_factor": 0.99,
+      "buffer_limit": 500
+    }
+  },
+  "REINFORCE": {
+    "nn_hyperparameters": {
+      "learning_rate": 0.001,
+      "discount_factor": 0.99,
+      "layers": [
+        64,
+        64
+      ]
+    }
+  },
+  "CMA": {
+    "cma_parameters": {}
+  },
+  "ODT": {
+    "odt_hyperparameters": {}
+  }
+}

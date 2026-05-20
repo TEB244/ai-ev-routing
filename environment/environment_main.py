@@ -280,7 +280,12 @@ class EnvironmentClass:
         self.raw_T_episode = 0.0
         self.raw_E_episode = 0.0
 
-        self.action_space = self.num_chargers * 3
+        # Action space dimensionality is set from config: action_dim is the
+        # number of discrete distance/traffic mix profiles the policy can
+        # select between. action_dim defaults to 5 for backward compatibility
+        # with the standard config; older configs may set it to 3.
+        self.action_dim = int(config.get('action_dim', 5))
+        self.action_space = self.num_chargers * self.action_dim
         self.observation_space = self.state_dim
 
         # Parameters to save data for stations and agents
@@ -1009,12 +1014,39 @@ class EnvironmentClass:
         if preset_path is None: # Reweight the graph based on the distribution provided
             num_nodes_to_update = graph.shape[0] - 2
             if not fixed_attributes:
-                # Assuming distribution has relevant values up to num_nodes_to_update
-                dist_slice = distribution[:num_nodes_to_update] # Keep on GPU
-                traffic_mult_tensor = 1 - dist_slice
-                distance_mult_tensor = dist_slice
+                # The agent's `distribution` (Q-net/policy outputs) is
+                # interpreted as a vote across N discrete *mix profiles*
+                # along a 1-D distance/traffic axis. argmax picks the
+                # active profile and the corresponding (distance_mult,
+                # traffic_mult) is applied uniformly to every candidate
+                # node.
+                #
+                # Profile i corresponds to mix coefficient w_i = i/(N-1):
+                #   distance_mult = 1 - w_i
+                #   traffic_mult  = w_i
+                # so profile 0 = pure distance and profile N-1 = pure
+                # traffic, with the rest evenly spaced in between. For
+                # the standard configuration N=5 this gives:
+                #   {0: pure-d, 1: lean-d, 2: balanced, 3: lean-t, 4: pure-t}
+                #
+                # This generalises the earlier 3-profile fix and avoids
+                # the per-node continuous weighting that does not align
+                # with discrete-action DQN / REINFORCE losses.
+                num_profiles = int(distribution.numel())
+                profile_idx = int(torch.argmax(distribution).item())
+                if num_profiles <= 1:
+                    w = 0.5
+                else:
+                    w = profile_idx / (num_profiles - 1)
+                distance_mult = 1.0 - w
+                traffic_mult  = w
+                traffic_mult_tensor = torch.full((num_nodes_to_update,), traffic_mult,
+                                                device=self.device, dtype=self.dtype)
+                distance_mult_tensor = torch.full((num_nodes_to_update,), distance_mult,
+                                                device=self.device, dtype=self.dtype)
             else:
-                # Create tensors if using fixed attributes
+                # Create tensors if using fixed attributes (kept for the
+                # hand-crafted policy diagnostic test).
                 traffic_mult_tensor = torch.full((num_nodes_to_update,), fixed_attributes[0],\
                                                 device=self.device, dtype=self.dtype)
                 distance_mult_tensor = torch.full((num_nodes_to_update,), fixed_attributes[1],\
@@ -1091,27 +1123,33 @@ class EnvironmentClass:
         route_dist = haversine(org_lat, org_long, dest_lat, dest_long)
 
 
-        # OLD COPY:
-        state = np.hstack((np.vstack((agent_unique_traffic[:, 1], dists)).reshape(-1),
-                           np.array([self.num_chargers * 3]), np.array([route_dist]),
-                           np.array([self.num_cars]), np.array([self.info['model_indices'][agent_idx]]),
-                           np.array([self.temperature]), np.array([self.timestep])))
-        # Update needed: the following line is just a temporary patch, it needs to be optimized so to avoid 
-        # performing unnecesary repetitions of the state creation
-        # state = torch.cat((
-        #     torch.cat((agent_unique_traffic[:, 1], dists), dim=0).reshape(-1),
-        #     torch.tensor([self.num_chargers * 3], device=self.device, dtype=self.dtype),
-        #     torch.tensor([route_dist], device=self.device, dtype=self.dtype),
-        #     torch.tensor([self.num_cars], device=self.device, dtype=self.dtype),
-        #     torch.tensor([self.info['model_indices'][agent_idx]], device=self.device, dtype=self.dtype),
-        #     torch.tensor([self.temperature], device=self.device, dtype=self.dtype),
-        #     torch.tensor([self.timestep], device=self.device, dtype=self.dtype)), dim=0)
-        
-        # Normalize the state values
-        state = (state - np.mean(state)) / np.std(state)
+        # Construct the state vector with FIXED per-feature normalization so the
+        # same raw value always maps to the same network input. Prior versions
+        # used per-state (state - state.mean()) / state.std(), which mixed
+        # traffic counts, distance in km, temperature, etc. into one scale and
+        # produced inconsistent representations between timesteps - the agent
+        # literally could not learn a stable mapping from features to action.
+        TRAFFIC_SCALE     = 30.0   # cars at peak station; rarely above 30
+        DISTANCE_SCALE    = 30.0   # km; route radius is 20
+        TEMPERATURE_SCALE = 30.0   # degrees Celsius
+        TIMESTEP_SCALE    = float(self.max_steps) if self.max_steps > 0 else 50.0
+        NUM_CARS_SCALE    = 100.0
+        MODEL_IDX_SCALE   = 3.0    # 3 vehicle models
+        N_CHARGER_SCALE   = 3.0
 
-        # Round the state values to 3 decimal places
-        # state = torch.round(state, 3)
+        traffic_norm = agent_unique_traffic[:, 1].astype(float) / TRAFFIC_SCALE
+        dists_norm   = dists.astype(float) / DISTANCE_SCALE
+        state = np.hstack((
+            np.vstack((traffic_norm, dists_norm)).reshape(-1),                     # 6 elems
+            np.array([(self.num_chargers * 3) / N_CHARGER_SCALE]),                  # 1
+            np.array([route_dist / DISTANCE_SCALE]),                                # 1
+            np.array([self.num_cars / NUM_CARS_SCALE]),                             # 1
+            np.array([self.info['model_indices'][agent_idx] / MODEL_IDX_SCALE]),    # 1
+            np.array([self.temperature / TEMPERATURE_SCALE]),                       # 1
+            np.array([self.timestep / TIMESTEP_SCALE]),                             # 1
+        )).astype(np.float32)
+
+        # Round for log compactness; resolution is still 1e-3 which is fine.
         state = np.round(state * 1000) / 1000
 
 
