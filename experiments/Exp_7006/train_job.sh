@@ -5,7 +5,7 @@
 #SBATCH -A def-mcapretz
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=6
-#SBATCH --time=8:00:00
+#SBATCH --time=13:00:00
 #SBATCH --mem=6G
 
 #SBATCH --mail-type=FAIL,TIME_LIMIT

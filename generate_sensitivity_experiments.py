@@ -77,6 +77,16 @@ BASELINE_SCALES = {
     "energy_scale": 0.001,
 }
 
+# Hyperparameter overrides applied on top of each cloned 4xxx template.
+# The 4xxx baselines use lr=1e-5 + buffer_limit=150 + discount=0.999, which
+# verified locally does NOT learn under the post-fix code path. Bumped to
+# values that DO learn at 100-car scale.
+NN_HYPERPARAM_OVERRIDES = {
+    "learning_rate":   1.0e-03,
+    "buffer_limit":    1500,
+    "discount_factor": 0.99,
+}
+
 START_EXP = 7000
 
 
@@ -114,7 +124,7 @@ def _dqn_train(exp_num: int, model: str) -> str:
 #SBATCH -A def-mcapretz
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=6
-#SBATCH --time=8:00:00
+#SBATCH --time=13:00:00
 #SBATCH --mem=6G
 
 #SBATCH --mail-type=FAIL,TIME_LIMIT
@@ -165,8 +175,10 @@ python main.py  -e {exp_num} -d "{SCRATCH_PATH[model]}" -eval True
 
 
 def _reinforce_train(exp_num: int, model: str) -> str:
-    # Wall time bumped from the 4036 template's 02:00:00 to 16:00:00 after
-    # observing TIMEOUTs on narval at 2h with the full 10k-episode config.
+    # Wall time progression: 4036 template was 02:00:00, bumped to 16:00:00
+    # after TIMEOUTs at 2h on narval, then bumped again to 21:00:00 after
+    # the post-fix code path added overhead that left REINFORCE close to
+    # the 16h limit.
     return f"""#!/bin/bash
 #SBATCH --job-name=Exp_{exp_num}_train
 #SBATCH --output=experiments/Exp_{exp_num}/output.log
@@ -174,7 +186,7 @@ def _reinforce_train(exp_num: int, model: str) -> str:
 #SBATCH -A def-mcapretz
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=6
-#SBATCH --time=16:00:00
+#SBATCH --time=21:00:00
 #SBATCH --mem=6G
 
 
@@ -409,6 +421,13 @@ def main():
 
                     # Inject seed
                     cfg["environment_settings"]["seed"] = seed
+
+                    # Override the nn_hyperparameters that govern actual
+                    # learning behaviour (the 4xxx templates use values that
+                    # do not learn under the post-fix code path).
+                    nn_block = cfg.setdefault("nn_hyperparameters", {})
+                    for k, v in NN_HYPERPARAM_OVERRIDES.items():
+                        nn_block[k] = v
 
                     # Always pin the unit-conversion scales at baseline.
                     for k, v in BASELINE_SCALES.items():

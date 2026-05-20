@@ -78,6 +78,13 @@ BASELINE_SCALES = {
     "energy_scale":   0.001,
 }
 
+# See generate_sensitivity_experiments.NN_HYPERPARAM_OVERRIDES.
+NN_HYPERPARAM_OVERRIDES = {
+    "learning_rate":   1.0e-03,
+    "buffer_limit":    1500,
+    "discount_factor": 0.99,
+}
+
 # Block sizing: 3 reward-shapes * 3 seeds = 9 experiments per model
 BLOCK_SIZE = 9
 
@@ -143,6 +150,10 @@ def main():
 
                 # Override: seed, weights (single-term), scales (baseline)
                 cfg["environment_settings"]["seed"] = seed
+                # Apply learning-rate / buffer-limit / discount overrides.
+                nn_block = cfg.setdefault("nn_hyperparameters", {})
+                for k, v in NN_HYPERPARAM_OVERRIDES.items():
+                    nn_block[k] = v
                 for k, v in BASELINE_SCALES.items():
                     cfg["environment_settings"][k] = float(v)
                 for k, v in weights.items():

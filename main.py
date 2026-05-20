@@ -332,9 +332,9 @@ def main_loop(args):
                             pass
 
                     if leaked:
-                        print(f"⚠️  {len(leaked)} live CUDA tensor(s) still allocated:")
+                        print(f"[WARN] {len(leaked)} live CUDA tensor(s) still allocated:")
                     else:
-                        print("✅  No live CUDA tensors found.")
+                        print("[OK] No live CUDA tensors found.")
 
                     for p in processes:
                         if p.is_alive():
@@ -549,9 +549,9 @@ def main_loop(args):
                             pass
 
                     if leaked:
-                        print(f"⚠️  {len(leaked)} live CUDA tensor(s) still allocated:")
+                        print(f"[WARN] {len(leaked)} live CUDA tensor(s) still allocated:")
                     else:
-                        print("✅  No live CUDA tensors found.")
+                        print("[OK] No live CUDA tensors found.")
 
                     for p in processes:
                         if p.is_alive():
