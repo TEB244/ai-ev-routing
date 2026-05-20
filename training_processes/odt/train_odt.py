@@ -46,7 +46,7 @@ class Experiment:
 
         self.evaluation = bool(getattr(self.args, "eval", False))
         self.reward_scale = 1
-        self.action_range = [1e-6, 1e-6]
+        self.action_range = [-1, 1]
         self.arwt = self.config['nn_hyperparameters']['average_rewards_when_training']
         self.base_dir = f"saved_networks/Exp_{self.experiment_number}"
 
@@ -237,6 +237,7 @@ class Experiment:
                 state_std=state_std,
                 reward_scale=self.reward_scale,
                 action_range=self.action_range,
+                is_offline=True,
             )
 
             train_outputs = trainer.train_iteration(
@@ -520,6 +521,8 @@ def train_odt(
     #On first aggregation, load dataset and train offline
     if aggregation_num == 0:
         trajectories, state_mean, state_std = experiment.train_offline()
+        for traj in trajectories:
+            traj['actions'] = 2 * traj['actions'] - 1
     #Otherwise, get previous agg trajectories and dataset stats
     else:
         trajectories = old_buffers
