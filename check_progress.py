@@ -42,23 +42,50 @@ except ImportError:
 REPO_ROOT = Path(__file__).resolve().parent
 
 
+# ------------------------------------------------------- algorithm -> owner
+# Each DM is run by a specific lab member (their scratch holds the metrics
+# and their SLURM account submits the job). This lets the script auto-fill
+# --user and --metrics-root when not explicitly given.
+ALGO_OWNER = {
+    "DQN":       "hartman",
+    "REINFORCE": "hartman",
+    "CMA":       "sgomezro",
+    "ODT":       "epigou",
+}
+
+
 # ----------------------------------------------------------- metrics resolution
-def metrics_root_candidates(override=None):
-    """Where to look for an experiment's metrics directory, in priority order."""
+def metrics_root_candidates(override=None, owner=None):
+    """Where to look for an experiment's metrics directory, in priority order.
+
+    If `owner` is provided (derived from the config's algorithm), the
+    owner-specific scratch path is tried first.
+    """
     if override:
         return [Path(override)]
-    return [
-        Path.home() / "scratch" / "metrics",          # DRAC / cluster
+    candidates = []
+    if owner:
+        candidates.append(Path(f"/home/{owner}/scratch/metrics"))
+    candidates.extend([
+        Path.home() / "scratch" / "metrics",          # DRAC / cluster ($USER)
         Path("/storage_1/metrics"),                    # huron lab server
-        Path("/home/hartman/scratch/metrics"),         # DRAC hartman explicit
+        Path("/home/hartman/scratch/metrics"),         # DRAC hartman (DQN/REINFORCE)
         Path("/home/sgomezro/scratch/metrics"),        # DRAC sgomezro (CMA)
         Path("/home/epigou/scratch/metrics"),          # DRAC epigou (ODT)
         REPO_ROOT / "_local_metrics",                  # local testing
-    ]
+    ])
+    # de-dup while preserving order
+    seen = set()
+    deduped = []
+    for c in candidates:
+        if c not in seen:
+            deduped.append(c)
+            seen.add(c)
+    return deduped
 
 
-def find_metrics_dir(exp_num, override=None):
-    for base in metrics_root_candidates(override):
+def find_metrics_dir(exp_num, override=None, owner=None):
+    for base in metrics_root_candidates(override, owner=owner):
         d = base / f"Exp_{exp_num}"
         if d.exists():
             return d
@@ -191,11 +218,13 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     p.add_argument("exp_num", type=int, help="Experiment number, e.g. 9000")
-    p.add_argument("--metrics-root", help="Override metrics root directory")
+    p.add_argument("--metrics-root", help="Override metrics root directory (default: inferred from algorithm owner)")
     p.add_argument(
         "--user",
-        default=os.environ.get("USER"),
-        help="SLURM user to query (default: $USER)",
+        default=None,
+        help="SLURM user to query (default: inferred from algorithm owner -- "
+             "hartman for DQN/REINFORCE, sgomezro for CMA, epigou for ODT; "
+             "falls back to $USER)",
     )
     args = p.parse_args()
 
@@ -212,7 +241,13 @@ def main():
     num_zones = len(cfg["environment_settings"]["coords"])
     expected_eps, agg_count, eps_per_agg = get_expected_episodes(cfg)
 
-    print(f"Exp_{args.exp_num}  ({algo}, seed={seed}, zones={num_zones})")
+    # Auto-fill user from the algorithm's owner (override with --user)
+    owner = ALGO_OWNER.get(algo)
+    if args.user is None:
+        args.user = owner or os.environ.get("USER")
+
+    owner_tag = f", owner={owner}" if owner else ""
+    print(f"Exp_{args.exp_num}  ({algo}, seed={seed}, zones={num_zones}{owner_tag})")
     if expected_eps is None:
         print(f"  Expected: unknown (algorithm '{algo}' not handled by this script)")
     else:
@@ -220,13 +255,13 @@ def main():
         print(f"  Expected: {agg_count} aggs * {eps_per_agg} eps "
               f"= {expected_eps} episodes{per_zone}")
 
-    # Find metrics
-    metrics_dir = find_metrics_dir(args.exp_num, args.metrics_root)
+    # Find metrics (owner-aware: try the algorithm owner's scratch first)
+    metrics_dir = find_metrics_dir(args.exp_num, args.metrics_root, owner=owner)
     slurm = check_slurm_status(args.exp_num, args.user)
 
     if metrics_dir is None:
         print(f"  Metrics:  NOT FOUND in any of:")
-        for c in metrics_root_candidates(args.metrics_root):
+        for c in metrics_root_candidates(args.metrics_root, owner=owner):
             print(f"              {c}")
         if slurm:
             elapsed = format_duration(slurm[2])

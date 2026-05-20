@@ -334,15 +334,24 @@ Four rows (one per algorithm), three columns (one per swept HP).
 Each subplot shows mean reward vs HP value with error bars across seeds.""")))
 cells.append(code(*split_lines("""if not summary.empty:
     algos = [b[0] for b in HP_BLOCKS]
-    fig, axes = plt.subplots(len(algos), 3, figsize=(15, 4 * len(algos)))
+    hp_dict = dict(HP_BLOCKS)
+    # Number of columns = max HPs across algorithms (some have more than others
+    # after the v2 batch: DQN and ODT now have 5, REINFORCE and CMA have 3).
+    max_hps = max(len(hp_dict[a]) for a in algos)
+    fig, axes = plt.subplots(len(algos), max_hps,
+                              figsize=(3.2 * max_hps + 2, 3.6 * len(algos)),
+                              squeeze=False)
     for r, algo in enumerate(algos):
-        hps_for_algo = [hp[0] for hp in dict(HP_BLOCKS)[algo]]
-        for c, hp_name in enumerate(hps_for_algo):
-            ax = axes[r, c] if len(algos) > 1 else axes[c]
+        hps_for_algo = hp_dict[algo]
+        for c, hp_tuple in enumerate(hps_for_algo):
+            hp_name = hp_tuple[0]
+            ax = axes[r, c]
             sub = summary[(summary['algorithm'] == algo) & (summary['hp_name'] == hp_name)]
             if sub.empty:
                 ax.text(0.5, 0.5, 'no data', ha='center', va='center', transform=ax.transAxes)
                 ax.set_xticks([])
+                ax.set_yticks([])
+                ax.set_title(f'{algo}: {hp_name}', fontsize=10)
                 continue
             agg = (sub.groupby(['hp_value', 'hp_value_sortkey'])['reward_mean']
                       .agg(['mean', 'std', 'count'])
@@ -352,8 +361,7 @@ cells.append(code(*split_lines("""if not summary.empty:
             ax.errorbar(xs, agg['mean'], yerr=agg['std'],
                         marker='o', lw=2, capsize=4, color=colors[algo])
             ax.set_xticks(xs)
-            ax.set_xticklabels([str(v) for v in agg['hp_value']], rotation=20, fontsize=8)
-            # Highlight best
+            ax.set_xticklabels([str(v) for v in agg['hp_value']], rotation=25, fontsize=8)
             best_idx = int(agg['mean'].idxmax()) if not agg['mean'].isna().all() else None
             if best_idx is not None:
                 best_pos = list(agg.index).index(best_idx)
@@ -362,7 +370,12 @@ cells.append(code(*split_lines("""if not summary.empty:
             ax.grid(alpha=0.3)
             if c == 0:
                 ax.set_ylabel('mean reward (last 200 eps)', fontsize=9)
-    fig.suptitle('Hyperparameter sweeps - reward vs swept value (3 seeds, error bars = std)', fontsize=12)
+        # Hide unused subplots when this algorithm has fewer HPs than the max
+        for c in range(len(hps_for_algo), max_hps):
+            axes[r, c].axis('off')
+    fig.suptitle('Hyperparameter sweeps - reward vs swept value (3 seeds, error bars = std)\\n'
+                 'v1 (9000-9179) + v2 (9180-9251) combined; red line = best value per HP',
+                 fontsize=12)
     plt.tight_layout()
     out = Path('figures') / 'hp_tuning_sweeps.png'
     out.parent.mkdir(parents=True, exist_ok=True)
