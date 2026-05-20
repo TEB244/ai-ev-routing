@@ -106,7 +106,7 @@ def vec_evaluate_episode_rtg(
     model.to(device=device)
     
     # Pre-allocate memory for trajectories for all cars with a fixed max length
-    max_traj_len = 7  # or adjust based on expected max length
+    max_traj_len = max_ep_len
     trajectories = [{
         'observations': torch.zeros((max_traj_len, state_dim), device=device, dtype=torch.float32),
         'actions': torch.zeros((max_traj_len, act_dim), device=device, dtype=torch.float32),
@@ -145,12 +145,13 @@ def vec_evaluate_episode_rtg(
                 num_envs=1,
             )
 
-            action = action_dist.mean.reshape(1, -1, act_dim)[-1, -1, :]
-            action = torch.sigmoid(action)
-            car_traj['actions'][car_traj['cur_len']] = action.detach()
+            action_tanh = action_dist.mean.reshape(1, -1, act_dim)[-1, -1, :]
+            action_env = (action_tanh + 1) / 2
+            if car_traj['cur_len'] < max_traj_len:
+                car_traj['actions'][car_traj['cur_len']] = action_tanh.detach()
 
             # Execute action
-            environment.generate_paths(action, None, car)
+            environment.generate_paths(action_env, None, car)
       
         sim_done, timestep_reward, arrived_at_final = environment.simulate_routes()
         
