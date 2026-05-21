@@ -5,11 +5,15 @@
 #SBATCH -A def-mcapretz
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=6
-#SBATCH --gpus-per-node=1
-#SBATCH --time=00:30:00
-#SBATCH --mem=160G
+#SBATCH --time=13:00:00
+#SBATCH --mem=6G
+
+#SBATCH --mail-type=FAIL,TIME_LIMIT
+#SBATCH --mail-user=lhartma8@uwo.ca
 
 echo "Starting training for experiment 3001"
+
+set -e  # Exit immediately if a command exits with a non-zero status
 
 module load python/3.10 cuda cudnn
 source ~/envs/merl_env/bin/activate
@@ -17,4 +21,5 @@ source ~/envs/merl_env/bin/activate
 # Enable multi-threading
 export OMP_NUM_THREADS=2
 
-python main.py -g 0 -e 3001 -d "/home/epigou/scratch/metrics/Exp"
+python main.py  -e 3001 -d "/home/hartman/scratch/metrics/Exp" -verb True
+

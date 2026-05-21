@@ -1,18 +1,27 @@
 algorithm_settings:
-  agent_by_zone: true
-  algorithm: ODT
+  agent_by_zone: false
+  algorithm: DQN
 cma_parameters:
   initial_sigma: 0.1
-  max_generations: 50
+  max_generations: 200
   model_type: optimizer
   population_dimension: 20
 environment_settings:
-  action_dim: 3
+  action_dim: 5
+  carbon_save_interval: 2
   coords:
   - - 43.02120034946083
     - -81.28349087468504
-  - - 43.004969336049854
-    - -81.18631870502043
+  - - 42.95923445066671
+    - -81.26016049362336
+  - - 42.98111190139387
+    - -81.30953935839466
+  - - 42.9819404397449
+    - -81.2508736429095
+  distance_scale: 100.0
+  distance_weight: 1.0
+  energy_scale: 0.001
+  energy_weight: 1.0
   ev_rationality: 0.9
   increase_rate: 12500
   max_charge:
@@ -25,16 +34,18 @@ environment_settings:
   - Tesla Model Y
   - BYD Song
   - Tesla Model 3
-  num_of_cars: 10
-  num_of_chargers: 3
+  num_of_cars: 100
+  num_of_chargers: 1
   radius: 20
   saving_data_deepness: episode_level
-  season: winter
+  season: spring
   seed: 1234
   start_sequence: random
   starting_charge: 6000
   step_size: 0.01
   traffic_noise: 3
+  traffic_scale: 1.0
+  traffic_weight: 1.0
   usage_per_hour:
   - 9840
   - 8460
@@ -47,35 +58,38 @@ eval_config:
   fixed_attributes: []
   generate_plots: false
   save_aggregate_rewards: false
-  save_data: false
-  save_offline_data: false
+  save_data: true
+  save_offline_data: true
   save_path_metrics:
     DRAC: ../../../storage_1/metrics/Exp
-    Local: /mnt/storage_1/merl/metrics//Exp
+    Local: /storage_1/merl/metrics//Exp
   verbose: true
 federated_learning_settings:
-  aggregation_count: 3
+  aggregation_count: 50
   city_multiplier: 0.15
   model_multiplier: 0.5
   zone_multiplier: 0.35
 nn_hyperparameters:
-  batch_size: 1000
-  buffer_limit: 2000
+  average_rewards_when_training: false
+  batch_size: 75
+  buffer_limit: 500
   city_multiplier: 0.15
-  discount_factor: 0.999
-  eps_per_save: 200
+  discount_factor: 0.99
+  eps_per_save: 100
   epsilon: 1
   epsilon_decay: 0.999
   layers:
   - 128
   - 64
   - 64
-  learning_rate: 1.0e-05
+  learning_rate: 0.01
   log_std_decay_rate: 0.01
   max_num_timesteps: 300
   model_multiplier: 0.5
-  num_episodes: 30
+  num_episodes: 200
   num_epochs: 10
+  target_episode_epsilon_frac: 0.3
+  target_network_update_frequency: 25
   zone_multiplier: 0.35
 odt_hyperparameters:
   K: 20
@@ -86,11 +100,12 @@ odt_hyperparameters:
   eval_context_length: 5
   eval_interval: 1
   eval_rtg: -60
-  exp_name: 1234-test
+  exp_name: 4143
+  experiment_number: 4023
   init_temperature: 0.1
   learning_rate: 0.0001
   log_to_tb: true
-  max_online_iters: 10
+  max_online_iters: 200
   max_pretrain_iters: 1
   n_head: 4
   n_layer: 4
@@ -100,6 +115,7 @@ odt_hyperparameters:
   num_updates_per_pretrain_iter: 500
   online_rtg: -60
   ordering: 0
+  persist_buffers: true
   replay_size: 500
   save_dir: ./exp
   warmup_steps: 10000
