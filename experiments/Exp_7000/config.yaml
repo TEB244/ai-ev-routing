@@ -66,7 +66,7 @@ federated_learning_settings:
 nn_hyperparameters:
   average_rewards_when_training: false
   batch_size: 75
-  buffer_limit: 1500
+  buffer_limit: 500
   city_multiplier: 0.15
   discount_factor: 0.99
   eps_per_save: 100
@@ -76,12 +76,14 @@ nn_hyperparameters:
   - 128
   - 64
   - 64
-  learning_rate: 0.001
+  learning_rate: 0.01
   log_std_decay_rate: 0.01
   max_num_timesteps: 300
   model_multiplier: 0.5
   num_episodes: 200
   num_epochs: 10
+  target_episode_epsilon_frac: 0.3
+  target_network_update_frequency: 25
   zone_multiplier: 0.35
 odt_hyperparameters:
   K: 20
