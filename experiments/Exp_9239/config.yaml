@@ -101,7 +101,7 @@ odt_hyperparameters:
   num_online_rollouts: 1
   num_updates_per_online_iter: 25
   num_updates_per_pretrain_iter: 500
-  offline_dataset_path: /home/epigou/rl-for-vrp-csp/metrics/Exp_3000/
+  offline_dataset_path: /home/epigou/scratch/metrics/Exp_3001/
   online_rtg: -30
   ordering: 0
   replay_size: 500
