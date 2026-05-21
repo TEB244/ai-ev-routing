@@ -3,7 +3,9 @@
     "nn_hyperparameters": {
       "learning_rate": 0.01,
       "discount_factor": 0.99,
-      "buffer_limit": 500
+      "buffer_limit": 500,
+      "target_network_update_frequency": 25,
+      "target_episode_epsilon_frac": 0.3
     }
   },
   "REINFORCE": {

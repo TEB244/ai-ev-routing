@@ -1,8 +1,10 @@
 algorithm,hp_name,best_value,best_reward,best_std,centre_value,note
-DQN,learning_rate,0.01,-80.19736393781503,3.190778075150202,0.001,unique best
+DQN,learning_rate,0.01,-80.19736393781503,3.190778075150202,0.001,2 tied (Occam-broken)
 DQN,discount_factor,0.99,-89.05016134688854,2.9251902667982295,0.99,5 tied (Occam-broken)
 DQN,buffer_limit,500.0,-88.8224160003662,3.7335169400158734,1500,3 tied (Occam-broken)
-REINFORCE,learning_rate,0.001,-92.20995051742393,0.4247619353941503,0.001,3 tied (Occam-broken)
+DQN,target_network_update_frequency,25.0,-89.05016134688854,2.9251902667982295,25,5 tied (Occam-broken)
+DQN,target_episode_epsilon_frac,0.3,-89.05016134688854,2.9251902667982295,0.3,5 tied (Occam-broken)
+REINFORCE,learning_rate,0.001,-92.20995051742393,0.4247619353941503,0.001,4 tied (Occam-broken)
 REINFORCE,discount_factor,0.99,-92.91976938624383,0.9283387009363279,0.99,3 tied (Occam-broken)
 REINFORCE,layers_arch,"[64, 64]",-91.81584457075597,1.2215448126846755,"[128, 64, 64]",4 tied (Occam-broken)
 CMA,initial_sigma,,,,0.1,no data
@@ -11,3 +13,5 @@ CMA,max_generations,,,,200,no data
 ODT,learning_rate,,,,0.0001,no data
 ODT,embed_dim,,,,512,no data
 ODT,n_layer,,,,4,no data
+ODT,K,,,,10,no data
+ODT,rtg,,,,-60,no data
