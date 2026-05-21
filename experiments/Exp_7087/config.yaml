@@ -78,7 +78,6 @@ nn_hyperparameters:
   epsilon: 1
   epsilon_decay: 0.999
   layers:
-  - 128
   - 64
   - 64
   learning_rate: 0.001
