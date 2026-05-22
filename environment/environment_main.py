@@ -736,8 +736,8 @@ class EnvironmentClass:
 
                 print(f"\n\n---\n\nHistorical charge graphs:")
                 for row in self.historical_charges_needed:
-                    # Use slicing to print every X-th column
-                    print(row[negative_index])
+                    if len(row) > negative_index:
+                        print(row[negative_index])
 
                 raise Exception("NEGATIVE BATTERY!")
 
