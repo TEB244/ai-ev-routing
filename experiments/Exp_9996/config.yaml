@@ -54,7 +54,7 @@ eval_config:
   save_data: true
   save_offline_data: false
   save_path_metrics:
-    DRAC: ../../../storage_1/metrics/Exp
+    DRAC: /home/epigou/scratch/metrics/Exp
     Local: ./_test_metrics/Exp
   verbose: true
 federated_learning_settings:
