@@ -454,7 +454,7 @@ class DecisionTransformer(TrajectoryModel):
                 map_location = lambda storage, loc: storage.cuda(0)
             else:
                 map_location = torch.device("cpu")
-            checkpoint = torch.load(f, map_location=map_location)
+            checkpoint = torch.load(f, map_location=map_location, weights_only=False)
         self.load_state_dict(checkpoint["model_state_dict"])
     
         if load_optimizer:
@@ -506,7 +506,7 @@ class DecisionTransformer(TrajectoryModel):
         if not weights_path.exists():
             raise FileNotFoundError(f"No global weights found at {weights_path}")
 
-        raw = torch.load(weights_path, map_location="cpu")
+        raw = torch.load(weights_path, map_location="cpu", weights_only=False)
         if not isinstance(raw, torch.Tensor):
             raise ValueError(f"Expected a Tensor but found {type(raw)} in {weights_path}")
 

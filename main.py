@@ -57,11 +57,7 @@ def main_loop(args):
     print(f"PyTorch CUDA available: {torch.cuda.is_available()}")
     print(f"PyTorch version: {torch.__version__}")
 
-    cuda_visible_devices = os.environ.get('CUDA_VISIBLE_DEVICES')
-    if cuda_visible_devices is not None:
-        available_gpus = cuda_visible_devices.split(',')
-    else:
-        available_gpus = [str(i) for i in range(torch.cuda.device_count())]
+    available_gpus = [str(i) for i in range(torch.cuda.device_count())]
 
     # Initializing GPUs for training
     n_gpus = len(args.list_gpus)
