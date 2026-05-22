@@ -178,6 +178,7 @@ cython_debug/
 /outputs
 /logs
 /saved_networks
+/_test_metrics
 /data
 /logs
 /logs

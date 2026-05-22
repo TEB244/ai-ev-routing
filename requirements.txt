@@ -1,23 +1,35 @@
+# Core
 filelock
 fsspec
 numpy
 requests
-geopy
-argparse
-mplcursors
-pandas
 pyyaml
-geopy
-argparse
-requests
-cma
-plotly
-jupyterlab
-tenacity
-plotly
 python-dotenv
+tenacity
 h5py
+
+# Geospatial
+geopy
+
+# Visualization / notebooks
+matplotlib
+mplcursors
+plotly
+seaborn
+jupyterlab
+
+# Data
+pandas
+
+# ODT — transformer backbone + training
+torch
+transformers
+tensorboard
+carbontracker
+
+# Other decision-maker algorithms
+cma
 pyvrp
 scikit-optimize
 pyomo
-glpk
+# glpk is a system package (apt/brew), not pip

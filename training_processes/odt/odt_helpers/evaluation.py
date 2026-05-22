@@ -127,31 +127,33 @@ def vec_evaluate_episode_rtg(
         timestep_counter = environment.init_routing()
         start_time_step = time.time()
 
+        # Phase 1: collect states from all cars (sequential — env interaction)
+        cur_len = trajectories[0]['cur_len']
         for car in range(num_cars):
             state = environment.reset_agent(car, False)
-            car_traj = trajectories[car]
+            if cur_len < max_traj_len:
+                trajectories[car]['observations'][cur_len] = torch.from_numpy(state).to(device=device, dtype=torch.float32)
 
-            # Add observation to pre-allocated tensor
-            if car_traj['cur_len'] < max_traj_len:
-                car_traj['observations'][car_traj['cur_len']] = torch.from_numpy(state).to(device=device, dtype=torch.float32)
+        # Phase 2: one batched forward pass for all cars
+        batched_obs = torch.stack([t['observations'][:cur_len + 1] for t in trajectories])
+        batched_actions = torch.stack([t['actions'][:cur_len] for t in trajectories])
+        batched_rewards = torch.stack([t['rewards'][:cur_len] for t in trajectories])
+        _, action_dist, _ = model.get_predictions(
+            (batched_obs - state_mean) / state_std,
+            batched_actions,
+            batched_rewards,
+            torch.tensor(target_return, device=device).reshape(1, 1).expand(num_cars, 1),
+            torch.tensor(timestep_counter, device=device, dtype=torch.long).reshape(1, 1).expand(num_cars, 1),
+            num_envs=num_cars,
+        )
+        all_actions_tanh = action_dist.mean[:, -1, :]  # (num_cars, act_dim)
 
-            # Get model predictions
-            state_pred, action_dist, reward_pred = model.get_predictions(
-                (car_traj['observations'][:car_traj['cur_len'] + 1] - state_mean) / state_std,
-                car_traj['actions'][:car_traj['cur_len']],
-                car_traj['rewards'][:car_traj['cur_len']],
-                torch.tensor(target_return, device=device).reshape(1, 1),
-                torch.tensor(timestep_counter, device=device, dtype=torch.long).reshape(1, 1),
-                num_envs=1,
-            )
-
-            action_tanh = action_dist.mean.reshape(1, -1, act_dim)[-1, -1, :]
-            action_env = (action_tanh + 1) / 2
-            if car_traj['cur_len'] < max_traj_len:
-                car_traj['actions'][car_traj['cur_len']] = action_tanh.detach()
-
-            # Execute action
-            environment.generate_paths(action_env, None, car)
+        # Phase 3: dispatch actions to all cars (sequential — env interaction)
+        for car in range(num_cars):
+            action_tanh = all_actions_tanh[car]
+            if cur_len < max_traj_len:
+                trajectories[car]['actions'][cur_len] = action_tanh.detach()
+            environment.generate_paths((action_tanh + 1) / 2, None, car)
       
         sim_done, timestep_reward, arrived_at_final = environment.simulate_routes()
         
