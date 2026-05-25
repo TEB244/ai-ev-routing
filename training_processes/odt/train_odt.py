@@ -19,9 +19,6 @@ from .odt_helpers.trainer import SequenceTrainer
 from .odt_helpers.logger import Logger
 from .odt_helpers.online_data import PersistentOnlineDataset, create_online_dataloader
 
-from carbontracker.tracker import CarbonTracker
-
-
 class NullCarbonTracker:
     def epoch_start(self): pass
     def epoch_end(self): pass
@@ -198,6 +195,7 @@ class Experiment:
         if getattr(self.args, 'server', 'DRAC') == 'DRAC':
             self.tracker = NullCarbonTracker()
         else:
+            from carbontracker.tracker import CarbonTracker
             self.tracker = CarbonTracker(epochs=(self.odt_config["max_pretrain_iters"] + self.odt_config["max_online_iters"]), epochs_before_pred=0, monitor_epochs=-1, update_interval=1, verbose=0, ignore_errors=True)
         eval_fns = [
             create_vec_eval_episodes_fn(
@@ -312,6 +310,7 @@ class Experiment:
             if getattr(self.args, 'server', 'DRAC') == 'DRAC':
                 self.tracker = NullCarbonTracker()
             else:
+                from carbontracker.tracker import CarbonTracker
                 self.tracker = CarbonTracker(epochs=self.odt_config["max_online_iters"], epochs_before_pred=0, monitor_epochs=-1, update_interval=1, verbose=0, ignore_errors=True)
         else:
             self.odt_config["max_offline_iters"] = self.odt_config["max_pretrain_iters"]
