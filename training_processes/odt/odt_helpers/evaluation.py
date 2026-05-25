@@ -156,7 +156,16 @@ def vec_evaluate_episode_rtg(
                 trajectories[car]['actions'][cur_len] = action_tanh.detach()
             environment.generate_paths((action_tanh + 1) / 2, None, car)
       
-        sim_done, timestep_reward, arrived_at_final = environment.simulate_routes()
+        try:
+            sim_done, timestep_reward, arrived_at_final = environment.simulate_routes()
+        except Exception as e:
+            if "NEGATIVE BATTERY" in str(e):
+                print(f"[WARN] Negative battery during evaluation — treating as terminal with penalty.", flush=True)
+                sim_done = True
+                timestep_reward = np.full(num_cars, -100.0)
+                arrived_at_final = np.zeros(num_cars, dtype=bool)
+            else:
+                raise
         
         dones.extend(arrived_at_final.tolist())
         if timestep_counter == 0:
