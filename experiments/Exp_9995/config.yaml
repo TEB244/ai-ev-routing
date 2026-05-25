@@ -101,7 +101,7 @@ odt_hyperparameters:
   num_online_rollouts: 1
   num_updates_per_online_iter: 5
   num_updates_per_pretrain_iter: 10
-  offline_dataset_path: /home/epigou/scratch/offline_datasets/Exp_9994/
+  offline_dataset_path: /home/epigou/scratch/offline_datasets/Exp_9994
   online_rtg: -60
   ordering: 0
   replay_size: 500
