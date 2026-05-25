@@ -21,6 +21,13 @@ from .odt_helpers.online_data import PersistentOnlineDataset, create_online_data
 
 from carbontracker.tracker import CarbonTracker
 
+
+class NullCarbonTracker:
+    def epoch_start(self): pass
+    def epoch_end(self): pass
+    def stop(self): pass
+
+
 class Experiment:
     def __init__(self, params):
         self.queue               = params['queue']
@@ -56,7 +63,7 @@ class Experiment:
         os.makedirs(self.base_dir, exist_ok=True)
         stats_dir = os.path.join(self.base_dir, "StateStats")
         os.makedirs(stats_dir, exist_ok=True)
-        self.stats_path = os.path.join(stats_dir, "state_stats.pkl")
+        self.stats_path = os.path.join(stats_dir, f"state_stats_zone_{self.zone_index}.pkl")
         
         self.logger = Logger(self.base_dir, self.experiment_number,
                              self.aggregation_num, self.zone_index)
@@ -188,7 +195,10 @@ class Experiment:
 
         offline_iter = 0
         print("\n\n\n*** Offline Training ***")
-        self.tracker = CarbonTracker(epochs=(self.odt_config["max_pretrain_iters"] + self.odt_config["max_online_iters"]), epochs_before_pred=0, monitor_epochs=-1, update_interval=1, verbose=0, ignore_errors=True)
+        if getattr(self.args, 'server', 'DRAC') == 'DRAC':
+            self.tracker = NullCarbonTracker()
+        else:
+            self.tracker = CarbonTracker(epochs=(self.odt_config["max_pretrain_iters"] + self.odt_config["max_online_iters"]), epochs_before_pred=0, monitor_epochs=-1, update_interval=1, verbose=0, ignore_errors=True)
         eval_fns = [
             create_vec_eval_episodes_fn(
                 queue=self.queue,
@@ -299,7 +309,10 @@ class Experiment:
         #Tracker for consecutive aggregations
         if self.aggregation_num > 0:
             self.odt_config["max_offline_iters"] = 0 #For logging purposes
-            self.tracker = CarbonTracker(epochs=self.odt_config["max_online_iters"], epochs_before_pred=0, monitor_epochs=-1, update_interval=1, verbose=0, ignore_errors=True)
+            if getattr(self.args, 'server', 'DRAC') == 'DRAC':
+                self.tracker = NullCarbonTracker()
+            else:
+                self.tracker = CarbonTracker(epochs=self.odt_config["max_online_iters"], epochs_before_pred=0, monitor_epochs=-1, update_interval=1, verbose=0, ignore_errors=True)
         else:
             self.odt_config["max_offline_iters"] = self.odt_config["max_pretrain_iters"]
         
