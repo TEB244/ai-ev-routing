@@ -190,15 +190,13 @@ class Experiment:
         with open(self.stats_path, 'wb') as f:
             pickle.dump({'state_mean': state_mean, 'state_std': state_std}, f)
 
-        import sys
         offline_iter = 0
-        print("\n\n\n*** Offline Training ***", flush=True)
+        print("\n\n\n*** Offline Training ***")
         if getattr(self.args, 'server', 'DRAC') == 'DRAC':
             self.tracker = NullCarbonTracker()
         else:
             from carbontracker.tracker import CarbonTracker
             self.tracker = CarbonTracker(epochs=(self.odt_config["max_pretrain_iters"] + self.odt_config["max_online_iters"]), epochs_before_pred=0, monitor_epochs=-1, update_interval=1, verbose=0, ignore_errors=True)
-        print(f"[DBG zone={self.zone_index}] creating eval_fns", flush=True)
         eval_fns = [
             create_vec_eval_episodes_fn(
                 queue=self.queue,
@@ -222,7 +220,6 @@ class Experiment:
             )
         ]
 
-        print(f"[DBG zone={self.zone_index}] creating SequenceTrainer", flush=True)
         trainer = SequenceTrainer(
             model=self.ODTAgent,
             optimizer=self.ODTAgent.optimizer,
@@ -231,13 +228,10 @@ class Experiment:
             device=self.device,
         )
 
-        print(f"[DBG zone={self.zone_index}] creating SummaryWriter", flush=True)
         writer = (
             SummaryWriter(self.logger.log_path)
         )
-        print(f"[DBG zone={self.zone_index}] entering training loop", flush=True)
         while offline_iter < self.odt_config["max_pretrain_iters"]:
-            print(f"[DBG zone={self.zone_index}] offline iter {offline_iter} start", flush=True)
             self.tracker.epoch_start() # Start tracking carbon emissions
             self.environment.init_sim(self.aggregation_num)
             dataloader = create_dataloader(
@@ -254,12 +248,10 @@ class Experiment:
                 is_offline=True,
             )
 
-            print(f"[DBG zone={self.zone_index}] calling train_iteration", flush=True)
             train_outputs = trainer.train_iteration(
                 loss_fn=self.loss_fn,
                 dataloader=dataloader,
             )
-            print(f"[DBG zone={self.zone_index}] train_iteration done, calling evaluateODT", flush=True)
             eval_outputs, _ = utils.evaluateODT(eval_fns, self.ODTAgent)
             outputs = {"time/total": time.time() - self.start_time}
             outputs.update(train_outputs)
