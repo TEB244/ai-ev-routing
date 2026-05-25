@@ -99,7 +99,8 @@ def train_route(queue, data_dir, ev_info, experiment_number, chargers, environme
 
     except Exception as e:
         import traceback
-        print(f"Error in process {ind} during aggregate step {aggregate_step}: {str(e)}")
-        traceback.print_exc()
+        print(f"Error in process {ind} during aggregate step {aggregate_step}: {str(e)}", flush=True)
+        traceback.print_exc(file=sys.stdout)
+        sys.stdout.flush()
         sys.exit(1) # Exit the program with a non-zero status
 
