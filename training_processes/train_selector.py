@@ -39,11 +39,19 @@ def train_route(queue, data_dir, ev_info, experiment_number, chargers, environme
         None
     """
 
+    import os
+    log_dir = f"logs/zones"
+    os.makedirs(log_dir, exist_ok=True)
+    zone_log_path = f"{log_dir}/zone_{ind}_agg_{aggregate_step}.log"
+    zone_log = open(zone_log_path, 'w', buffering=1)  # line-buffered
+    sys.stdout = zone_log
+    sys.stderr = zone_log
+
     try:
         # Create a deep copy of the environment for this thread
         chargers_copy = copy.deepcopy(chargers)
 
-        print(f'algorithm dm {algorithm_dm}')
+        print(f'algorithm dm {algorithm_dm}', flush=True)
 
         if algorithm_dm == 'DQN':
             from training_processes.dqn_v2 import train_dqn as train
@@ -92,15 +100,22 @@ def train_route(queue, data_dir, ev_info, experiment_number, chargers, environme
             local_weights_list[ind] = local_weights_per_agent
             weights_to_save[ind] = local_weights_per_agent
 
-        print(f"Thread {ind} waiting")
+        print(f"Thread {ind} waiting", flush=True)
 
         if train_model and num_zones > 1:
-            barrier.wait()  # Wait for all threads to finish before proceeding
+            try:
+                barrier.wait(timeout=300)  # 5-minute timeout; raises BrokenBarrierError if a zone crashed
+            except Exception as barrier_err:
+                print(f"[Zone {ind}] Barrier failed (another zone likely crashed): {barrier_err}", flush=True)
+                sys.exit(1)
 
     except Exception as e:
         import traceback
         print(f"Error in process {ind} during aggregate step {aggregate_step}: {str(e)}", flush=True)
         traceback.print_exc(file=sys.stdout)
         sys.stdout.flush()
+        zone_log.close()
         sys.exit(1) # Exit the program with a non-zero status
+    finally:
+        zone_log.close()
 
