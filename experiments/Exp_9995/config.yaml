@@ -11,12 +11,16 @@ environment_settings:
   coords:
   - - 43.02120034946083
     - -81.28349087468504
+  - - 43.004969336049854
+    - -81.18631870502043
   - - 42.95923445066671
     - -81.26016049362336
   - - 42.98111190139387
     - -81.30953935839466
-  - - 42.9819404397449
-    - -81.2508736429095
+  distance_scale: 100.0
+  distance_weight: 0.0
+  energy_scale: 0.001
+  energy_weight: 1.0
   ev_rationality: 0.9
   increase_rate: 12500
   max_charge:
@@ -29,7 +33,7 @@ environment_settings:
   - Tesla Model Y
   - BYD Song
   - Tesla Model 3
-  num_of_cars: 5
+  num_of_cars: 10
   num_of_chargers: 1
   radius: 20
   saving_data_deepness: episode_level
@@ -39,6 +43,8 @@ environment_settings:
   starting_charge: 6000
   step_size: 0.01
   traffic_noise: 3
+  traffic_scale: 1.0
+  traffic_weight: 1.0
   usage_per_hour:
   - 9840
   - 8460
@@ -79,7 +85,7 @@ nn_hyperparameters:
   log_std_decay_rate: 0.01
   max_num_timesteps: 300
   model_multiplier: 0.5
-  num_episodes: 50
+  num_episodes: 150
   num_epochs: 10
   zone_multiplier: 0.35
 odt_hyperparameters:
@@ -94,16 +100,17 @@ odt_hyperparameters:
   exp_name: 9995
   init_temperature: 0.1
   learning_rate: 0.0001
-  max_pretrain_iters: 5
+  max_pretrain_iters: 2
+  forward_mode: batched
   n_head: 4
   n_layer: 4
   num_eval_episodes: 1
   num_online_rollouts: 1
-  num_updates_per_online_iter: 5
-  num_updates_per_pretrain_iter: 10
-  offline_dataset_path: /home/epigou/scratch/offline_datasets/Exp_9994
+  num_updates_per_online_iter: 2
+  num_updates_per_pretrain_iter: 2
+  offline_dataset_path: ./_test_metrics/Exp_9994/
   online_rtg: -60
   ordering: 0
   replay_size: 500
-  warmup_steps: 50
+  warmup_steps: 200
   weight_decay: 0.0005

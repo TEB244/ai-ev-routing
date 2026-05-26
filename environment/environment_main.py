@@ -730,16 +730,19 @@ class EnvironmentClass:
                 print(f"TARGET BATTERY:\n{target_battery_level}")
 
             if torch.any(battery <= 0):
-                # Print the graph for the car that ran out of battery
                 negative_index = torch.where(battery <= 0)[0][0].item()
-                print(f"\n\n---\n\nCharge graph of {negative_index} who died, mini-step {mini_step_count}:\n{self.charges_needed[negative_index]}")
-
-                print(f"\n\n---\n\nHistorical charge graphs:")
-                for row in self.historical_charges_needed:
-                    if len(row) > negative_index:
-                        print(row[negative_index])
-
-                raise Exception("NEGATIVE BATTERY!")
+                battery_val = battery[negative_index].item()
+                charge_graph = str(self.charges_needed[negative_index])
+                historical = "\n".join(
+                    str(row[negative_index]) for row in self.historical_charges_needed
+                    if len(row) > negative_index
+                )
+                raise Exception(
+                    f"NEGATIVE BATTERY! car={negative_index}, mini_step={mini_step_count}, "
+                    f"battery={battery_val:.2f}\n"
+                    f"charge_graph:\n{charge_graph}\n"
+                    f"historical_charges:\n{historical}"
+                )
 
             # Update which cars will move
             moving = (charging_status - 1) * -1
