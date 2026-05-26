@@ -35,6 +35,7 @@ def create_vec_eval_episodes_fn(
     reward_scale=0.001,
     start_sequence='static',
     seed=None,
+    forward_mode='batched',
 ):
     def eval_episodes_fn(model):
         target_return = [eval_rtg * reward_scale] * 1
@@ -55,7 +56,7 @@ def create_vec_eval_episodes_fn(
             max_ep_len=MAX_EPISODE_LEN,
             reward_scale=reward_scale,
             target_return=target_return,
-            mode="normal",
+            mode=forward_mode,
             state_mean=state_mean,
             state_std=state_std,
             device=device,
@@ -100,7 +101,7 @@ def vec_evaluate_episode_rtg(
     mode="normal",
     use_mean=False,
 ):
-    eval_rng = np.random.default_rng(seed)
+    eval_rng = seed if isinstance(seed, np.random.Generator) else np.random.default_rng(seed)
     # Move state_mean and state_std to the device once
     state_mean = torch.tensor(state_mean, device=device) if isinstance(state_mean, np.ndarray) else state_mean
     state_std = torch.tensor(state_std, device=device) if isinstance(state_std, np.ndarray) else state_std
@@ -126,8 +127,11 @@ def vec_evaluate_episode_rtg(
     timestep_counter = 0
     episode_rewards = []
     dones = []
-    #Maybe move outside of this file
 
+    # Per-car running RTG buffer: pre-allocated like obs/action/reward buffers.
+    # Column t holds RTG_t = target_return - sum(rewards[0..t-1]).
+    rtg_buffer = torch.zeros((num_cars, max_traj_len + 1), device=device, dtype=torch.float32)
+    rtg_buffer[:, 0] = target_return[0]
 
     while not sim_done:
         timestep_counter = environment.init_routing()
@@ -140,39 +144,63 @@ def vec_evaluate_episode_rtg(
         else:
             starting_car = 0
 
-        # Phase 1: collect states from all cars (sequential — env interaction)
-        # Also cache self.agent per car — generate_paths reads self.agent and reset_agent
-        # overwrites it, so without caching every car in Phase 3 would use the last car's data.
-        saved_agents = {}
-        for i in range(num_cars):
-            car = (starting_car + i) % num_cars
-            state = environment.reset_agent(car, False)
-            saved_agents[car] = environment.agent
-            if cur_len < max_traj_len:
-                trajectories[car]['observations'][cur_len] = torch.from_numpy(state).to(device=device, dtype=torch.float32)
+        if mode == 'sequential':
+            # One car at a time: reset_agent → forward pass → generate_paths
+            # Mirrors DQN exactly — traffic accumulates between cars within a sim-step.
+            for i in range(num_cars):
+                car = (starting_car + i) % num_cars
+                state = environment.reset_agent(car, False)
+                if cur_len < max_traj_len:
+                    trajectories[car]['observations'][cur_len] = torch.from_numpy(state).to(device=device, dtype=torch.float32)
+                obs = trajectories[car]['observations'][:cur_len + 1].unsqueeze(0)
+                acts = trajectories[car]['actions'][:cur_len].unsqueeze(0)
+                rews = trajectories[car]['rewards'][:cur_len].unsqueeze(0)
+                _, action_dist, _ = model.get_predictions(
+                    (obs - state_mean) / state_std,
+                    acts,
+                    rews,
+                    rtg_buffer[car, :cur_len + 1].unsqueeze(0),
+                    torch.tensor(timestep_counter, device=device, dtype=torch.long).reshape(1, 1),
+                    num_envs=1,
+                )
+                action_tanh = action_dist.mean[0, -1, :]
+                if cur_len < max_traj_len:
+                    trajectories[car]['actions'][cur_len] = action_tanh.detach()
+                environment.generate_paths((action_tanh + 1) / 2, None, car)
+        else:
+            # Phase 1: collect states from all cars (sequential — env interaction)
+            # Cache self.agent per car — generate_paths reads self.agent and reset_agent
+            # overwrites it, so without caching every car in Phase 3 would use the last car's data.
+            saved_agents = {}
+            for i in range(num_cars):
+                car = (starting_car + i) % num_cars
+                state = environment.reset_agent(car, False)
+                saved_agents[car] = environment.agent
+                if cur_len < max_traj_len:
+                    trajectories[car]['observations'][cur_len] = torch.from_numpy(state).to(device=device, dtype=torch.float32)
 
-        # Phase 2: one batched forward pass for all cars
-        batched_obs = torch.stack([t['observations'][:cur_len + 1] for t in trajectories])
-        batched_actions = torch.stack([t['actions'][:cur_len] for t in trajectories])
-        batched_rewards = torch.stack([t['rewards'][:cur_len] for t in trajectories])
-        _, action_dist, _ = model.get_predictions(
-            (batched_obs - state_mean) / state_std,
-            batched_actions,
-            batched_rewards,
-            torch.tensor(target_return, device=device).reshape(1, 1).expand(num_cars, 1),
-            torch.tensor(timestep_counter, device=device, dtype=torch.long).reshape(1, 1).expand(num_cars, 1),
-            num_envs=num_cars,
-        )
-        all_actions_tanh = action_dist.mean[:, -1, :]  # (num_cars, act_dim)
+            # Phase 2: one batched forward pass for all cars
+            batched_obs = torch.stack([t['observations'][:cur_len + 1] for t in trajectories])
+            batched_actions = torch.stack([t['actions'][:cur_len] for t in trajectories])
+            batched_rewards = torch.stack([t['rewards'][:cur_len] for t in trajectories])
+            _, action_dist, _ = model.get_predictions(
+                (batched_obs - state_mean) / state_std,
+                batched_actions,
+                batched_rewards,
+                rtg_buffer[:, :cur_len + 1],
+                torch.tensor(timestep_counter, device=device, dtype=torch.long).reshape(1, 1).expand(num_cars, 1),
+                num_envs=num_cars,
+            )
+            all_actions_tanh = action_dist.mean[:, -1, :]  # (num_cars, act_dim)
 
-        # Phase 3: dispatch actions to all cars (sequential — env interaction)
-        for i in range(num_cars):
-            car = (starting_car + i) % num_cars
-            environment.agent = saved_agents[car]  # restore before generate_paths reads self.agent
-            action_tanh = all_actions_tanh[car]
-            if cur_len < max_traj_len:
-                trajectories[car]['actions'][cur_len] = action_tanh.detach()
-            environment.generate_paths((action_tanh + 1) / 2, None, car)
+            # Phase 3: dispatch actions to all cars (sequential — env interaction)
+            for i in range(num_cars):
+                car = (starting_car + i) % num_cars
+                environment.agent = saved_agents[car]  # restore before generate_paths reads self.agent
+                action_tanh = all_actions_tanh[car]
+                if cur_len < max_traj_len:
+                    trajectories[car]['actions'][cur_len] = action_tanh.detach()
+                environment.generate_paths((action_tanh + 1) / 2, None, car)
       
         try:
             sim_done, timestep_reward, arrived_at_final = environment.simulate_routes()
@@ -214,6 +242,12 @@ def vec_evaluate_episode_rtg(
                 traj['terminals'][traj['cur_len']] = sim_done
 
             traj['cur_len'] += 1
+
+        # Decrement each car's RTG by the reward just stored (cur_len was incremented above)
+        cur_step = trajectories[0]['cur_len'] - 1
+        rtg_buffer[:, cur_step + 1] = rtg_buffer[:, cur_step] - torch.stack(
+            [traj['rewards'][cur_step] for traj in trajectories]
+        )
 
         time_step_time = time.time() - start_time_step
             

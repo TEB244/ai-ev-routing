@@ -219,6 +219,7 @@ class Experiment:
                 reward_scale=self.reward_scale,
                 start_sequence=self.config['environment_settings'].get('start_sequence', 'static'),
                 seed=self.seed,
+                forward_mode=self.odt_config.get('forward_mode', 'batched'),
             )
         ]
 
@@ -302,7 +303,8 @@ class Experiment:
 
         online_iter = 0
         total_transitions_sampled = 0
-        
+        online_rng = np.random.default_rng(self.seed)
+
         #Create replay buffer from trajectories:
         replay_buffer = ReplayBuffer(self.odt_config['replay_size'], trajectories)
 
@@ -361,6 +363,7 @@ class Experiment:
                 reward_scale=self.reward_scale,
                 start_sequence=self.config['environment_settings'].get('start_sequence', 'static'),
                 seed=self.seed,
+                forward_mode=self.odt_config.get('forward_mode', 'batched'),
             )
         ]
         writer = (
@@ -394,12 +397,12 @@ class Experiment:
                     max_ep_len=self.Max_episode_len,
                     reward_scale=self.reward_scale,
                     target_return=target_return,
-                    mode="normal",
+                    mode=self.odt_config.get('forward_mode', 'batched'),
                     state_mean=state_mean,
                     state_std=state_std,
                     device=self.device,
                     start_sequence=self.config['environment_settings'].get('start_sequence', 'static'),
-                seed=self.seed,
+                    seed=online_rng,
                 )
             online_dataset.update_with_new_trajectories(trajs)
             total_transitions_sampled += int(np.sum(lengths))
@@ -537,10 +540,22 @@ def train_odt(
     experiment.init_agent()
     
     #On first aggregation, load dataset and train offline
-    if aggregation_num == 0:
+    if aggregation_num == 0 and experiment.odt_config["max_pretrain_iters"] > 0:
         trajectories, state_mean, state_std = experiment.train_offline()
         for traj in trajectories:
             traj['actions'] = 2 * traj['actions'] - 1
+    elif aggregation_num == 0:
+        # No pretrain requested — skip offline data loading, use unit normalization
+        trajectories = []
+        state_mean = np.zeros(experiment.environment.state_dim, dtype=np.float32)
+        state_std = np.ones(experiment.environment.state_dim, dtype=np.float32)
+        with open(experiment.stats_path, 'wb') as f:
+            pickle.dump({'state_mean': state_mean, 'state_std': state_std}, f)
+        if getattr(args, 'server', 'DRAC') == 'DRAC':
+            experiment.tracker = NullCarbonTracker()
+        else:
+            from carbontracker.tracker import CarbonTracker
+            experiment.tracker = CarbonTracker(epochs=config['odt_hyperparameters']['max_online_iters'], epochs_before_pred=0, monitor_epochs=-1, update_interval=1, verbose=0, ignore_errors=True)
     #Otherwise, get previous agg trajectories and dataset stats
     else:
         trajectories = old_buffers

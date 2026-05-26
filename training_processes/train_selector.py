@@ -39,14 +39,6 @@ def train_route(queue, data_dir, ev_info, experiment_number, chargers, environme
         None
     """
 
-    import os
-    log_dir = f"logs/zones"
-    os.makedirs(log_dir, exist_ok=True)
-    zone_log_path = f"{log_dir}/zone_{ind}_agg_{aggregate_step}.log"
-    zone_log = open(zone_log_path, 'w', buffering=1)  # line-buffered
-    sys.stdout = zone_log
-    sys.stderr = zone_log
-
     try:
         # Create a deep copy of the environment for this thread
         chargers_copy = copy.deepcopy(chargers)
@@ -114,8 +106,5 @@ def train_route(queue, data_dir, ev_info, experiment_number, chargers, environme
         print(f"Error in process {ind} during aggregate step {aggregate_step}: {str(e)}", flush=True)
         traceback.print_exc(file=sys.stdout)
         sys.stdout.flush()
-        zone_log.close()
         sys.exit(1) # Exit the program with a non-zero status
-    finally:
-        zone_log.close()
 

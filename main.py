@@ -142,13 +142,17 @@ def main_loop(args):
     # Assign GPUs to zones
     n_zones = len(env_c['coords'])
     gpus_size = len(gpus)
-    exp_devices = [gpus[i % gpus_size] for i in range(n_zones)]
     if n_gpus == 0:
         devices = ['cpu' for _ in range(n_zones)]
     else:
-        for i, gpu in enumerate(exp_devices):
+        if n_gpus != n_zones:
+            raise ValueError(
+                f"GPU count ({n_gpus}) must equal zone count ({n_zones}). "
+                f"Pass one GPU per zone, e.g. -g 0 1 2 3 for 4 zones."
+            )
+        devices = gpus
+        for i, gpu in enumerate(devices):
             print(f'Zone {i} with GPU {gpu} - {torch.cuda.get_device_name(gpu)}')
-    devices = [gpus[i % gpus_size] for i in range(n_zones)]
 
     # Get seed for current experiment
     seed = env_c['seed']
@@ -314,7 +318,12 @@ def main_loop(args):
                     print("Started Training Processes")
 
                     for process in processes:
-                        process.join()
+                        process.join(timeout=3600)
+                    hung = [i for i, p in enumerate(processes) if p.is_alive()]
+                    if hung:
+                        for i in hung:
+                            processes[i].terminate()
+                        raise RuntimeError(f"Zone(s) {hung} did not finish within 3600 s — terminated.")
 
                     print("Joined Processes")
                     failed_zones = [i for i, p in enumerate(processes) if p.exitcode != 0]
@@ -534,7 +543,12 @@ def main_loop(args):
                     print("Started Training Processes")
 
                     for process in processes:
-                        process.join()
+                        process.join(timeout=3600)
+                    hung = [i for i, p in enumerate(processes) if p.is_alive()]
+                    if hung:
+                        for i in hung:
+                            processes[i].terminate()
+                        raise RuntimeError(f"Zone(s) {hung} did not finish within 3600 s — terminated.")
 
                     print("Joined Training Processes")
                     
