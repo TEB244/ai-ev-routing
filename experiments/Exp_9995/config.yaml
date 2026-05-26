@@ -7,7 +7,7 @@ cma_parameters:
   model_type: optimizer
   population_dimension: 20
 environment_settings:
-  action_dim: 3
+  action_dim: 5
   coords:
   - - 43.02120034946083
     - -81.28349087468504
@@ -54,11 +54,11 @@ eval_config:
   save_data: true
   save_offline_data: false
   save_path_metrics:
-    DRAC: ../../../storage_1/metrics/Exp
+    DRAC: /home/epigou/scratch/metrics/Exp
     Local: ./_test_metrics/Exp
   verbose: true
 federated_learning_settings:
-  aggregation_count: 1
+  aggregation_count: 2
   city_multiplier: 0.15
   model_multiplier: 0.5
   zone_multiplier: 0.35
@@ -79,7 +79,7 @@ nn_hyperparameters:
   log_std_decay_rate: 0.01
   max_num_timesteps: 300
   model_multiplier: 0.5
-  num_episodes: 10
+  num_episodes: 50
   num_epochs: 10
   zone_multiplier: 0.35
 odt_hyperparameters:
@@ -101,7 +101,7 @@ odt_hyperparameters:
   num_online_rollouts: 1
   num_updates_per_online_iter: 5
   num_updates_per_pretrain_iter: 10
-  offline_dataset_path: ./_test_metrics/Exp_9994
+  offline_dataset_path: /home/epigou/scratch/offline_datasets/Exp_9994
   online_rtg: -60
   ordering: 0
   replay_size: 500

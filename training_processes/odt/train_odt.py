@@ -19,7 +19,11 @@ from .odt_helpers.trainer import SequenceTrainer
 from .odt_helpers.logger import Logger
 from .odt_helpers.online_data import PersistentOnlineDataset, create_online_dataloader
 
-from carbontracker.tracker import CarbonTracker
+class NullCarbonTracker:
+    def epoch_start(self): pass
+    def epoch_end(self): pass
+    def stop(self): pass
+
 
 class Experiment:
     def __init__(self, params):
@@ -56,7 +60,7 @@ class Experiment:
         os.makedirs(self.base_dir, exist_ok=True)
         stats_dir = os.path.join(self.base_dir, "StateStats")
         os.makedirs(stats_dir, exist_ok=True)
-        self.stats_path = os.path.join(stats_dir, "state_stats.pkl")
+        self.stats_path = os.path.join(stats_dir, f"state_stats_zone_{self.zone_index}.pkl")
         
         self.logger = Logger(self.base_dir, self.experiment_number,
                              self.aggregation_num, self.zone_index)
@@ -188,7 +192,11 @@ class Experiment:
 
         offline_iter = 0
         print("\n\n\n*** Offline Training ***")
-        self.tracker = CarbonTracker(epochs=(self.odt_config["max_pretrain_iters"] + self.odt_config["max_online_iters"]), epochs_before_pred=0, monitor_epochs=-1, update_interval=1, verbose=0, ignore_errors=True)
+        if getattr(self.args, 'server', 'DRAC') == 'DRAC':
+            self.tracker = NullCarbonTracker()
+        else:
+            from carbontracker.tracker import CarbonTracker
+            self.tracker = CarbonTracker(epochs=(self.odt_config["max_pretrain_iters"] + self.odt_config["max_online_iters"]), epochs_before_pred=0, monitor_epochs=-1, update_interval=1, verbose=0, ignore_errors=True)
         eval_fns = [
             create_vec_eval_episodes_fn(
                 queue=self.queue,
@@ -209,6 +217,8 @@ class Experiment:
                 metrics_path=self.metrics_base_path,
                 use_mean=True,
                 reward_scale=self.reward_scale,
+                start_sequence=self.config['environment_settings'].get('start_sequence', 'static'),
+                seed=self.seed,
             )
         ]
 
@@ -223,9 +233,9 @@ class Experiment:
         writer = (
             SummaryWriter(self.logger.log_path)
         )
+        self.environment.init_sim(self.aggregation_num)
         while offline_iter < self.odt_config["max_pretrain_iters"]:
             self.tracker.epoch_start() # Start tracking carbon emissions
-            self.environment.init_sim(self.aggregation_num)
             dataloader = create_dataloader(
                 trajectories=trajectories,
                 num_iters=self.odt_config["num_updates_per_pretrain_iter"],
@@ -299,7 +309,11 @@ class Experiment:
         #Tracker for consecutive aggregations
         if self.aggregation_num > 0:
             self.odt_config["max_offline_iters"] = 0 #For logging purposes
-            self.tracker = CarbonTracker(epochs=self.odt_config["max_online_iters"], epochs_before_pred=0, monitor_epochs=-1, update_interval=1, verbose=0, ignore_errors=True)
+            if getattr(self.args, 'server', 'DRAC') == 'DRAC':
+                self.tracker = NullCarbonTracker()
+            else:
+                from carbontracker.tracker import CarbonTracker
+                self.tracker = CarbonTracker(epochs=self.odt_config["max_online_iters"], epochs_before_pred=0, monitor_epochs=-1, update_interval=1, verbose=0, ignore_errors=True)
         else:
             self.odt_config["max_offline_iters"] = self.odt_config["max_pretrain_iters"]
         
@@ -345,19 +359,21 @@ class Experiment:
                 metrics_path=self.metrics_base_path,
                 use_mean=True,
                 reward_scale=self.reward_scale,
+                start_sequence=self.config['environment_settings'].get('start_sequence', 'static'),
+                seed=self.seed,
             )
         ]
         writer = (
             SummaryWriter(self.logger.log_path)
         )
 
+        self.environment.init_sim(self.aggregation_num)
         while online_iter < self.odt_config["max_online_iters"]:
             self.tracker.epoch_start()
             online_dataloader = create_online_dataloader(
                 online_dataset,
                 batch_size=self.odt_config['batch_size']
             )
-            self.environment.init_sim(self.aggregation_num)
             outputs = {} 
             with torch.no_grad(): 
                 target_return = [self.odt_config["online_rtg"] * self.reward_scale]
@@ -382,6 +398,8 @@ class Experiment:
                     state_mean=state_mean,
                     state_std=state_std,
                     device=self.device,
+                    start_sequence=self.config['environment_settings'].get('start_sequence', 'static'),
+                seed=self.seed,
                 )
             online_dataset.update_with_new_trajectories(trajs)
             total_transitions_sampled += int(np.sum(lengths))

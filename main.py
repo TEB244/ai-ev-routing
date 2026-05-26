@@ -317,6 +317,9 @@ def main_loop(args):
                         process.join()
 
                     print("Joined Processes")
+                    failed_zones = [i for i, p in enumerate(processes) if p.exitcode != 0]
+                    if failed_zones:
+                        raise RuntimeError(f"Zone(s) {failed_zones} exited with non-zero exit code — aborting federated learning.")
 
                     gc.collect()
                     leaked = []

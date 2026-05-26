@@ -11,7 +11,6 @@ import time
 
 from training_processes.writer_proccess import printer_queue
 
-
 MAX_EPISODE_LEN = 1000
 
 
@@ -34,6 +33,8 @@ def create_vec_eval_episodes_fn(
     metrics_path,
     use_mean=False,
     reward_scale=0.001,
+    start_sequence='static',
+    seed=None,
 ):
     def eval_episodes_fn(model):
         target_return = [eval_rtg * reward_scale] * 1
@@ -59,6 +60,8 @@ def create_vec_eval_episodes_fn(
             state_std=state_std,
             device=device,
             use_mean=use_mean,
+            start_sequence=start_sequence,
+            seed=seed,
         )
         suffix = "_gm" if use_mean else ""
         return {
@@ -91,10 +94,13 @@ def vec_evaluate_episode_rtg(
     reward_scale=0.001,
     state_mean=0.0,
     state_std=1.0,
+    start_sequence='static',
+    seed=None,
     device="cuda",
     mode="normal",
     use_mean=False,
 ):
+    eval_rng = np.random.default_rng(seed)
     # Move state_mean and state_std to the device once
     state_mean = torch.tensor(state_mean, device=device) if isinstance(state_mean, np.ndarray) else state_mean
     state_std = torch.tensor(state_std, device=device) if isinstance(state_std, np.ndarray) else state_std
@@ -129,9 +135,19 @@ def vec_evaluate_episode_rtg(
 
         cur_len = trajectories[0]['cur_len']
 
+        if start_sequence == 'random':
+            starting_car = int(eval_rng.integers(0, num_cars))
+        else:
+            starting_car = 0
+
         # Phase 1: collect states from all cars (sequential — env interaction)
-        for car in range(num_cars):
+        # Also cache self.agent per car — generate_paths reads self.agent and reset_agent
+        # overwrites it, so without caching every car in Phase 3 would use the last car's data.
+        saved_agents = {}
+        for i in range(num_cars):
+            car = (starting_car + i) % num_cars
             state = environment.reset_agent(car, False)
+            saved_agents[car] = environment.agent
             if cur_len < max_traj_len:
                 trajectories[car]['observations'][cur_len] = torch.from_numpy(state).to(device=device, dtype=torch.float32)
 
@@ -150,13 +166,32 @@ def vec_evaluate_episode_rtg(
         all_actions_tanh = action_dist.mean[:, -1, :]  # (num_cars, act_dim)
 
         # Phase 3: dispatch actions to all cars (sequential — env interaction)
-        for car in range(num_cars):
+        for i in range(num_cars):
+            car = (starting_car + i) % num_cars
+            environment.agent = saved_agents[car]  # restore before generate_paths reads self.agent
             action_tanh = all_actions_tanh[car]
             if cur_len < max_traj_len:
                 trajectories[car]['actions'][cur_len] = action_tanh.detach()
             environment.generate_paths((action_tanh + 1) / 2, None, car)
       
-        sim_done, timestep_reward, arrived_at_final = environment.simulate_routes()
+        try:
+            sim_done, timestep_reward, arrived_at_final = environment.simulate_routes()
+        except Exception as e:
+            if "NEGATIVE BATTERY" in str(e):
+                import traceback, os
+                log_path = os.path.join(os.path.dirname(metrics_path), "negative_battery.log")
+                with open(log_path, "a") as f:
+                    f.write(f"\n=== episode={episode_num} agg={aggregation_num} zone={zone_index} sim_step={timestep_counter} ===\n")
+                    f.write(f"starting_charge: {environment.info['starting_charge']}\n")
+                    f.write(f"paths: {environment.paths}\n")
+                    f.write(f"charges_needed (current):\n{environment.charges_needed}\n")
+                    f.write(traceback.format_exc())
+                print(f"[WARN] Negative battery — logged to {log_path}", flush=True)
+                sim_done = True
+                timestep_reward = np.full(num_cars, -100.0)
+                arrived_at_final = np.zeros(num_cars, dtype=bool)
+            else:
+                raise
         
         dones.extend(arrived_at_final.tolist())
         if timestep_counter == 0:
