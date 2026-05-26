@@ -228,6 +228,9 @@ def read_excel_data(file_path, sheet_name):
 
 def save_to_csv(data, filename, append=False):
 
+    if data is None or (hasattr(data, '__len__') and len(data) == 0):
+        return
+
     mode = 'a' if append else 'w'
     file_exists = os.path.isfile(filename)
     if isinstance(data[0], dict):
