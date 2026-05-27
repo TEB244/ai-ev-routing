@@ -94,6 +94,7 @@ odt_hyperparameters:
   exp_name: 9262
   init_temperature: 0.1
   learning_rate: 0.01
+  max_offline_trajectories: 50000
   max_pretrain_iters: 1
   n_head: 4
   n_layer: 4
