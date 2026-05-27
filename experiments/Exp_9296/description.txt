@@ -1,0 +1,23 @@
+
+### Experiment 9296: HP tuning ###
+--------------------------------------
+Algorithm:  ODT
+Swept HP:   n_layer
+HP value:   8
+HP centre:  4  (post-fix default we are calibrating against)
+Seed:       2020
+
+Computational scope:
+  zones:    1   (template had 4)
+  season:   spring
+  RL aggregation count: 25   (template had 50)
+
+Reward weights pinned at recommended baseline:
+  distance_weight: 1.0   traffic_weight: 1.0   energy_weight: 1.0
+Scales pinned at unit-conversion defaults:
+  distance_scale: 100    traffic_scale: 1      energy_scale: 0.001
+
+Purpose: identify the best value for n_layer for ODT. Combined
+with the other two HP sweeps for ODT, this batch determines the
+HP configuration to use when re-running the main 4xxx/5xxx/6xxx
+experiments.
