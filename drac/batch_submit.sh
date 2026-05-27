@@ -4,8 +4,8 @@
 #SBATCH --error=drac/logs/odt_batch_%j.err
 #SBATCH -A rrg-kgroling
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=16
-#SBATCH --time=36:00:00
+#SBATCH --cpus-per-task=20
+#SBATCH --time=5:30:00
 #SBATCH --mem=128G
 #SBATCH --gpus-per-node=4
 

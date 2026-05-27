@@ -90,7 +90,7 @@ odt_hyperparameters:
   embed_dim: 512
   eval_context_length: 5
   eval_interval: 1
-  eval_rtg: -60
+  eval_rtg: -79
   exp_name: 9304
   init_temperature: 0.1
   learning_rate: 0.0001
@@ -103,7 +103,7 @@ odt_hyperparameters:
   num_updates_per_online_iter: 25
   num_updates_per_pretrain_iter: 500
   offline_dataset_path: /scratch/epigou/metrics/Exp_3001/
-  online_rtg: -60
+  online_rtg: -79
   ordering: 0
   replay_size: 500
   warmup_steps: 200
