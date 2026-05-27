@@ -99,8 +99,10 @@ class TransformSamplingSubTraj:
         if tlen != act_len:
             raise ValueError
 
-        ss = np.concatenate([np.zeros((self.max_len - tlen, self.state_dim)), ss])
+        # Normalise the real timesteps BEFORE padding so padded zeros are not
+        # fed through the normalization (constants would produce -mean/1e-6 ~ -1e6).
         ss = (ss - self.state_mean) / self.state_std
+        ss = np.concatenate([np.zeros((self.max_len - tlen, self.state_dim)), ss])
 
         if self.is_offline:
             # Stored actions are env actions in (0,1); convert to tanh space (-1,1)
