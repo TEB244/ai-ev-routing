@@ -13,8 +13,8 @@ for exp_num in range(exp_range[0], exp_range[1]+1):
 
     # train_job = train_job.replace("--time=48:00:00", "--time=48:00:00\n#SBATCH --mem=12G\n#SBATCH --gpus-per-node=2")
 
-    train_job = train_job.replace("--cpus-per-task=1", "--cpus-per-task=2")
-    # train_job = train_job.replace("--mem=1608M", "--mem=1792M")
+    # train_job = train_job.replace("--cpus-per-task=2", "--cpus-per-task=1")
+    train_job = train_job.replace("--mem=1792M", "--mem=1608M")
 
     # Save train_job.sh
     with open(os.path.join(exp_dir, "train_job.sh"), "w") as f:
