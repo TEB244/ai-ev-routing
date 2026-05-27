@@ -124,32 +124,37 @@ class Experiment:
                 raise FileNotFoundError(f"No .h5 files found for zone {load_zone}")
             dataset_path = min(matching_files, key=os.path.getctime)
     
+        max_trajs = self.odt_config.get('max_offline_trajectories', None)
+
         trajectories = []
         try:
             with h5py.File(dataset_path, 'r') as f:
                 zone_key = f"zone_{load_zone}"
                 if zone_key not in f:
                     raise RuntimeError(f"Zone {load_zone} not found in {dataset_path}")
-    
+
                 zone_group = f[zone_key]
-                for traj_key in zone_group:
+                all_keys = sorted(zone_group.keys(), key=lambda k: int(k.split('_')[1]))
+                if max_trajs is not None:
+                    all_keys = all_keys[-max_trajs:]
+                    print(f"[INFO] Loading last {len(all_keys)} trajectories from {len(zone_group)} total")
+
+                for traj_key in all_keys:
                     traj_data = {}
                     traj_group = zone_group[traj_key]
-    
-                    # Extract trajectory data
+
                     for key in traj_group:
                         dataset = traj_group[key]
                         if dataset.shape == ():
                             traj_data[key] = dataset[()]
                         else:
                             traj_data[key] = dataset[:]
-    
-                    # Extract metadata from attributes
+
                     for attr_key in traj_group.attrs:
                         traj_data[attr_key] = traj_group.attrs[attr_key]
-    
+
                     trajectories.append(traj_data)
-    
+
         except Exception as e:
             print(f"[ERROR] Failed to load from path: {dataset_path}")
             raise RuntimeError(f"Failed to load dataset from {dataset_path}: {e}")

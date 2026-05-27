@@ -101,7 +101,10 @@ class TransformSamplingSubTraj:
 
         # Normalise the real timesteps BEFORE padding so padded zeros are not
         # fed through the normalization (constants would produce -mean/1e-6 ~ -1e6).
-        ss = (ss - self.state_mean) / self.state_std
+        # Clip to [-10, 10] to prevent near-zero-std features (e.g. traffic=0 in
+        # 99.9% of steps) from producing values like 33000 that cause NaN in the
+        # transformer.
+        ss = np.clip((ss - self.state_mean) / self.state_std, -10.0, 10.0)
         ss = np.concatenate([np.zeros((self.max_len - tlen, self.state_dim)), ss])
 
         if self.is_offline:
@@ -121,7 +124,11 @@ class TransformSamplingSubTraj:
 
         ss = torch.from_numpy(ss).to(dtype=torch.float32)
         aa = torch.from_numpy(aa).to(dtype=torch.float32)
-        aa = aa.clamp(*self.action_range)
+        # Clamp strictly inside (-1, 1) so atanh(a) stays finite in the log-prob.
+        # Offline DQN actions are sigmoid(Q) which saturates to exactly ±1 in
+        # float32 for large Q-values, causing atanh(±1) = ±inf → NaN loss/grads.
+        _eps = 1e-6
+        aa = aa.clamp(self.action_range[0] + _eps, self.action_range[1] - _eps)
         rr = torch.from_numpy(rr).to(dtype=torch.float32)
         dd = torch.from_numpy(dd).to(dtype=torch.long)
         rtg = torch.from_numpy(rtg).to(dtype=torch.float32)
