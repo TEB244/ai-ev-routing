@@ -79,7 +79,7 @@ nn_hyperparameters:
   log_std_decay_rate: 0.01
   max_num_timesteps: 300
   model_multiplier: 0.5
-  num_episodes: 200
+  num_episodes: 10 #200
   num_epochs: 10
   zone_multiplier: 0.35
 odt_hyperparameters:
