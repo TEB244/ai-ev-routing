@@ -54,7 +54,7 @@ eval_config:
   save_data: true
   save_offline_data: true
   save_path_metrics:
-    DRAC: ../../../storage_1/metrics/Exp
+    DRAC: ../../..//storage_1/metrics/Exp
     Local: /mnt/storage_1/merl/metrics//Exp
   verbose: true
 federated_learning_settings:
@@ -79,7 +79,7 @@ nn_hyperparameters:
   log_std_decay_rate: 0.01
   max_num_timesteps: 300
   model_multiplier: 0.5
-  num_episodes: 10 #200
+  num_episodes: 200
   num_epochs: 10
   zone_multiplier: 0.35
 odt_hyperparameters:
