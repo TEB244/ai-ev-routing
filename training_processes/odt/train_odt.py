@@ -156,24 +156,45 @@ class Experiment:
     
         # Convert lists back to NumPy arrays and normalize data
         states, traj_lens, returns = [], [], []
+        n_dropped = 0
         for traj in trajectories:
             traj["observations"] = np.array(traj["observations"], dtype=np.float32)
             traj["rewards"]      = np.array(traj["rewards"], dtype=np.float32)
             traj["actions"]      = np.array(traj["actions"], dtype=np.float32)
-    
+
+            if (np.any(~np.isfinite(traj["observations"])) or
+                    np.any(~np.isfinite(traj["rewards"])) or
+                    np.any(~np.isfinite(traj["actions"]))):
+                n_dropped += 1
+                continue
+
             states.append(traj["observations"])
             traj_lens.append(len(traj["observations"]))
             returns.append(sum(traj['rewards']))
-    
+
+        if n_dropped:
+            print(f"[WARN] Dropped {n_dropped} trajectories containing NaN/inf values")
+
         traj_lens, returns = np.array(traj_lens), np.array(returns)
         states = np.concatenate(states, axis=0)
+
+        bad_rows = ~np.all(np.isfinite(states), axis=1)
+        if bad_rows.any():
+            print(f"[WARN] Dropping {bad_rows.sum()} NaN/inf timesteps from offline dataset before normalisation")
+            states = states[~bad_rows]
+
         state_mean, state_std = np.mean(states, axis=0), np.std(states, axis=0) + 1e-6
+        print(f"[INFO] state_mean min/max: {state_mean.min():.4f}/{state_mean.max():.4f}  "
+              f"state_std min/max: {state_std.min():.6f}/{state_std.max():.4f}")
         num_timesteps = sum(traj_lens)
     
         print("=" * 50)
         print(f"Dataset for Zone {load_zone} loaded successfully from {dataset_path}")
         print(f"{len(traj_lens)} trajectories, {num_timesteps} timesteps")
-        print(f"Average return: {np.mean(returns):.2f}, std: {np.std(returns):.2f}")
+        print(f"Return stats: mean={np.mean(returns):.2f}, std={np.std(returns):.2f}, "
+              f"min={np.min(returns):.2f}, max={np.max(returns):.2f}, "
+              f"p5={np.percentile(returns, 5):.2f}, p25={np.percentile(returns, 25):.2f}, "
+              f"p75={np.percentile(returns, 75):.2f}, p95={np.percentile(returns, 95):.2f}")
         print("=" * 50)
     
         # Sort and filter trajectories by return
