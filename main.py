@@ -102,10 +102,6 @@ def main_loop(args):
     # Whether to continue the training
     load_existing_model = eval_c['continue_training']
 
-    # Directory where logs are saved
-    logs_dir = 'logs'
-    if not os.path.exists(logs_dir):
-        os.makedirs(logs_dir)
 
     # Directory where models are saved (the global weights)
     save_global_path = f'saved_networks/Exp_{experiment_number}/'
@@ -126,6 +122,10 @@ def main_loop(args):
         shutil.rmtree(metrics_with_sub_dir)
     os.makedirs(metrics_with_sub_dir)
 
+    # Directory where logs are saved
+    logs_dir = f'{metrics_base_path}/logs'
+    if not os.path.exists(logs_dir):
+        os.makedirs(logs_dir)
 
     if algorithm_dm in ["DQN", "PPO", "DDPG", "REINFORCE", "ODT"]: # reinforcement learning
         num_episodes = c['nn_hyperparameters']['num_episodes']
