@@ -14,7 +14,6 @@
 
 echo "Starting parallel batch: Exp 9994, 9995, 9996, 9997"
 
-set -e
 
 module load python/3.10 cuda cudnn
 source ~/envs/merl_env/bin/activate
@@ -27,10 +26,10 @@ nvidia-cuda-mps-control -d
 
 mkdir -p drac/logs
 
-python main.py -g 0 -e 9994 -server DRAC > experiments/Exp_9994/output.log 2> experiments/Exp_9994/error.log &
-python main.py -g 1 -e 9995 -server DRAC > experiments/Exp_9995/output.log 2> experiments/Exp_9995/error.log &
-python main.py -g 2 -e 9996 -server DRAC > experiments/Exp_9996/output.log 2> experiments/Exp_9996/error.log &
-python main.py -g 3 -e 9997 -server DRAC > experiments/Exp_9997/output.log 2> experiments/Exp_9997/error.log &
+python main.py -g 0 1 2 3 -e 9994 -server DRAC > experiments/Exp_9994/output.log 2> experiments/Exp_9994/error.log &
+python main.py -g 0 1 2 3 -e 9995 -server DRAC > experiments/Exp_9995/output.log 2> experiments/Exp_9995/error.log &
+python main.py -g 0 1 2 3 -e 9996 -server DRAC > experiments/Exp_9996/output.log 2> experiments/Exp_9996/error.log &
+python main.py -g 0 1 2 3 -e 9997 -server DRAC > experiments/Exp_9997/output.log 2> experiments/Exp_9997/error.log &
 
 wait
 echo "All experiments finished"
