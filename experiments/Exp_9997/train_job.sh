@@ -4,9 +4,9 @@
 #SBATCH --error=experiments/Exp_9997/error.log
 #SBATCH -A rrg-kgroling
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=16
-#SBATCH --time=36:00:00
-#SBATCH --mem=32G
+#SBATCH --cpus-per-task=2
+#SBATCH --time=5:30:00
+#SBATCH --mem=12G
 #SBATCH --gpus-per-node=4
 
 #SBATCH --mail-type=FAIL,TIME_LIMIT
