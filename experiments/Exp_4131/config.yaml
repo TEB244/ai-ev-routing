@@ -91,7 +91,7 @@ odt_hyperparameters:
   embed_dim: 512
   eval_context_length: 5
   eval_interval: 1
-  eval_rtg: -60
+  eval_rtg: -50
   evaluation: false
   exp_name: 4131
   experiment_number: 4023
@@ -106,8 +106,8 @@ odt_hyperparameters:
   num_online_rollouts: 1
   num_updates_per_online_iter: 25
   num_updates_per_pretrain_iter: 500
-  offline_dataset_path: /home/epigou/scratch/metrics/Exp_3001/
-  online_rtg: -60
+  offline_dataset_path: /scratch/epigou/metrics/Exp_3001/
+  online_rtg: -50
   ordering: 0
   persist_buffers: true
   replay_size: 500
