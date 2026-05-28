@@ -5,8 +5,8 @@
 #SBATCH -A rrg-kgroling
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=2
-#SBATCH --time=00:10:00
-#SBATCH --mem=8G
+#SBATCH --time=5:30:00
+#SBATCH --mem=12G
 #SBATCH --gpus-per-node=4
 #SBATCH --mail-type=FAIL,TIME_LIMIT,END
 #SBATCH --mail-user=epigou@uwo.ca

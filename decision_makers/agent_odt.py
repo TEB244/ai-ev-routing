@@ -450,10 +450,7 @@ class DecisionTransformer(TrajectoryModel):
         if not model_file.exists():
             return
         with open(model_file, "rb") as f:
-            if torch.cuda.is_available() and torch.cuda.device_count() > 0:
-                map_location = lambda storage, loc: storage.cuda(0)
-            else:
-                map_location = torch.device("cpu")
+            map_location = torch.device(self.device)
             checkpoint = torch.load(f, map_location=map_location, weights_only=False)
         self.load_state_dict(checkpoint["model_state_dict"])
     

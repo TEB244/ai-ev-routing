@@ -4,9 +4,9 @@
 #SBATCH --error=drac/logs/batch_test_9135_9138_%j.err
 #SBATCH -A rrg-kgroling
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=4
-#SBATCH --time=36:00:00
-#SBATCH --mem=32G
+#SBATCH --cpus-per-task=8
+#SBATCH --time=5:30:00
+#SBATCH --mem=36G
 #SBATCH --gpus-per-node=1
 
 #SBATCH --mail-type=FAIL,TIME_LIMIT
