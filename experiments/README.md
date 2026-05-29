@@ -263,7 +263,7 @@ Each algorithm's 45 experiments split into 3 sweeps of 15 each
 |---|---|---|---|---|
 | 9000–9044 | DQN | `learning_rate` ∈ {1e-5, 1e-4, 1e-3, 3e-3, 1e-2} | `discount_factor` ∈ {0.90, 0.95, 0.99, 0.995, 0.999} | `buffer_limit` ∈ {150, 500, 1500, 5000, 15000} |
 | 9045–9089 | REINFORCE | same as DQN | same as DQN | `layers_arch` (5 preset architectures) |
-| 9090–9134 | CMA | `initial_sigma` ∈ {0.01, 0.05, 0.10, 0.30, 1.00} | `population_dimension` ∈ {10, 20, 40, 80, 160} | `max_generations` ∈ {50, 100, 200, 400, 800} |
+| 9090–9134 | CMA | `initial_sigma` ∈ {0.01, 0.05, 0.10, 0.30, 1.00} | `population_dimension` ∈ {10, 20, 40, 80, 100} | `max_generations` ∈ {50, 100, 200, 400, 800} |
 | 9135–9179 | ODT | `learning_rate` ∈ {1e-5, 1e-4, 1e-3, 1e-2, 1e-1} | `embed_dim` ∈ {64, 128, 256, 512, 1024} | `n_layer` ∈ {1, 2, 4, 6, 8} |
 
 The centre value of each sweep (offset +6,+7,+8 within the 15-block)

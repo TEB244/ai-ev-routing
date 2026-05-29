@@ -3,7 +3,7 @@
 --------------------------------------
 Algorithm:  CMA
 Swept HP:   population_dimension
-HP value:   160
+HP value:   100
 HP centre:  20  (post-fix default we are calibrating against)
 Seed:       1234
 
