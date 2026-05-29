@@ -83,8 +83,9 @@ def train_route(queue, data_dir, ev_info, experiment_number, chargers, environme
         et = time.time() - st
 
         if verbose:
+            logs_dir = f'{data_dir}_{experiment_number}/logs'
             run_mode = 'Evaluating' if args.eval else "Training" 
-            with open(f'logs/{date}-{run_mode}_logs.txt', 'a') as file:
+            with open(f'{logs_dir}/{date}-{run_mode}_logs.txt', 'a') as file:
                 print(f'Spent {et:.3f} seconds saving results', file=file)  # Print saving time with 3 decimal places
             print(f'Spent {et:.3f} seconds saving results')  # Print saving time with 3 decimal places
 
