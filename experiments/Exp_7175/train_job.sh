@@ -22,10 +22,6 @@ source ~/envs/merl_env/bin/activate
 # Enable multi-threading
 export OMP_NUM_THREADS=4
 
-# Activate Nvidia MPS:
-export CUDA_MPS_PIPE_DIRECTORY=/tmp/nvidia-mps
-export CUDA_MPS_LOG_DIRECTORY=/tmp/nvidia-log
-nvidia-cuda-mps-control -d
 
 
 python main.py -g 0 -e 7175 -d "/home/epigou/scratch/metrics/Exp"
