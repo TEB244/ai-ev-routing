@@ -154,7 +154,7 @@ HP_BLOCKS = [
          0.10),
         ("population_dimension",
          ("cma_parameters", "population_dimension"),
-         [10, 20, 40, 80, 160],
+         [10, 20, 40, 80, 100],   # 100 instead of 160 (160 was too slow on cluster)
          20),
         ("max_generations",
          ("cma_parameters", "max_generations"),
