@@ -5,7 +5,7 @@
 #SBATCH -A rrg-kgroling
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=16
-#SBATCH --time=22:00:00
+#SBATCH --time=120:00:00
 #SBATCH --mem=128G
 #SBATCH --gpus-per-node=1
 
