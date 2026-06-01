@@ -4,10 +4,10 @@
 #SBATCH --error=experiments/Exp_9999/error.log
 #SBATCH -A rrg-kgroling
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=2
+#SBATCH --cpus-per-task=16
 #SBATCH --time=5:30:00
-#SBATCH --mem=12G
-#SBATCH --gpus-per-node=4
+#SBATCH --mem=128G
+#SBATCH --gpus-per-node=1
 #SBATCH --mail-type=FAIL,TIME_LIMIT,END
 #SBATCH --mail-user=epigou@uwo.ca
 
@@ -30,7 +30,7 @@ nvidia-smi \
     > experiments/Exp_9999/gpu.log &
 GPU_MONITOR_PID=$!
 
-python main.py -e 9999 -server DRAC -g 0 1 2 3
+python main.py -e 9999 -server DRAC -g 0
 
 kill $GPU_MONITOR_PID 2>/dev/null || true
 
