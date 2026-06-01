@@ -110,6 +110,9 @@ class Experiment:
     
         # Locate the dataset file
         data_dir = self.odt_config['offline_dataset_path']
+        available = len(glob.glob(os.path.join(data_dir, "data_zone_*.h5")))
+        if available > 0:
+            load_zone = load_zone % available
         dataset_path = os.path.join(data_dir, f"data_zone_{load_zone}.h5")
     
         # fallback to drac path
