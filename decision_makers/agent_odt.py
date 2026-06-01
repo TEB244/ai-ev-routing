@@ -450,7 +450,7 @@ class DecisionTransformer(TrajectoryModel):
         if not model_file.exists():
             return
         with open(model_file, "rb") as f:
-            map_location = torch.device(self.device)
+            map_location = next(self.parameters()).device
             checkpoint = torch.load(f, map_location=map_location, weights_only=False)
         self.load_state_dict(checkpoint["model_state_dict"])
     
