@@ -23,6 +23,6 @@ source ~/envs/merl_env/bin/activate
 
 export OMP_NUM_THREADS=1
 
-python main.py -e 9999 -server DRAC
+python main.py -e 9999 -server DRAC -g 0
 
 echo "End: $(date)"
