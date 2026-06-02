@@ -98,6 +98,7 @@ odt_hyperparameters:
   learning_rate: 0.0001
   max_online_iters: 2
   max_pretrain_iters: 1
+  offline_dataset_path: /scratch/epigou/metrics/Exp_3001/
   n_head: 2
   n_layer: 2
   num_eval_episodes: 1
