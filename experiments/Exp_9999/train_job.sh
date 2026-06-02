@@ -4,14 +4,13 @@
 #SBATCH --error=experiments/Exp_9999/error.log
 #SBATCH -A rrg-kgroling
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=16
-#SBATCH --time=5:30:00
-#SBATCH --mem=128G
-#SBATCH --gpus-per-node=1
+#SBATCH --cpus-per-task=2
+#SBATCH --time=00:05:00
+#SBATCH --mem=2G
 #SBATCH --mail-type=FAIL,TIME_LIMIT,END
 #SBATCH --mail-user=epigou@uwo.ca
 
-echo "=== Exp_9999 training ==="
+echo "=== Exp_9999 e2e smoke test ==="
 echo "Job ID: $SLURM_JOB_ID"
 echo "Node:   $SLURMD_NODENAME"
 echo "Start:  $(date)"
@@ -21,18 +20,8 @@ set -e
 module load python/3.10 cuda cudnn
 source ~/envs/merl_env/bin/activate
 
-export OMP_NUM_THREADS=2
+export OMP_NUM_THREADS=1
 
-# Poll GPU utilisation every 30s in the background
-nvidia-smi \
-    --query-gpu=timestamp,utilization.gpu,utilization.memory,memory.used,memory.total \
-    --format=csv -l 30 \
-    > experiments/Exp_9999/gpu.log &
-GPU_MONITOR_PID=$!
-
-python main.py -e 9999 -server DRAC -g 0
-
-kill $GPU_MONITOR_PID 2>/dev/null || true
+python main.py -e 9999 -server DRAC
 
 echo "End: $(date)"
-echo "Run 'seff $SLURM_JOB_ID' for CPU/memory efficiency summary."

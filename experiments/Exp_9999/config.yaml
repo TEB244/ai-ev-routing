@@ -3,20 +3,15 @@ algorithm_settings:
   algorithm: ODT
 cma_parameters:
   initial_sigma: 0.1
-  max_generations: 200
+  max_generations: 2
   model_type: optimizer
-  population_dimension: 20
+  population_dimension: 5
 environment_settings:
   action_dim: 5
+  carbon_save_interval: 2
   coords:
   - - 43.02120034946083
     - -81.28349087468504
-  - - 43.004969336049854
-    - -81.18631870502043
-  - - 42.95923445066671
-    - -81.26016049362336
-  - - 42.98111190139387
-    - -81.30953935839466
   distance_scale: 100.0
   distance_weight: 0.0
   energy_scale: 0.001
@@ -27,13 +22,13 @@ environment_settings:
   - 170000
   - 90000
   - 170000
-  max_mini_sim_steps: 10
-  max_sim_steps: 50
+  max_mini_sim_steps: 5
+  max_sim_steps: 10
   models:
   - Tesla Model Y
   - BYD Song
   - Tesla Model 3
-  num_of_cars: 100
+  num_of_cars: 5
   num_of_chargers: 1
   radius: 20
   saving_data_deepness: episode_level
@@ -64,54 +59,53 @@ eval_config:
     Local: ./_test_metrics/Exp
   verbose: true
 federated_learning_settings:
-  aggregation_count: 2
+  aggregation_count: 1
   city_multiplier: 0.15
   model_multiplier: 0.5
   zone_multiplier: 0.35
 nn_hyperparameters:
   average_rewards_when_training: false
-  batch_size: 75
-  buffer_limit: 150
+  batch_size: 8
+  buffer_limit: 32
   city_multiplier: 0.15
-  discount_factor: 0.999
-  eps_per_save: 2
+  discount_factor: 0.99
+  eps_per_save: 3
   epsilon: 1
   epsilon_decay: 0.999
   layers:
-  - 128
   - 64
-  - 64
-  learning_rate: 1.0e-05
+  - 32
+  learning_rate: 0.01
   log_std_decay_rate: 0.01
-  max_num_timesteps: 300
+  max_num_timesteps: 50
   model_multiplier: 0.5
-  num_episodes: 15
-  num_epochs: 10
+  num_episodes: 3
+  num_epochs: 2
+  target_episode_epsilon_frac: 0.3
+  target_network_update_frequency: 5
   zone_multiplier: 0.35
 odt_hyperparameters:
-  K: 10
+  K: 5
   activation_function: relu
-  batch_size: 32
+  batch_size: 16
   dropout: 0.1
-  embed_dim: 128
+  embed_dim: 64
   eval_context_length: 5
   eval_interval: 1
   eval_rtg: -20
   exp_name: 9999
   init_temperature: 0.1
   learning_rate: 0.0001
-  max_offline_trajectories: 50000
-  max_pretrain_iters: 2
-  forward_mode: sequential
-  n_head: 4
-  n_layer: 4
+  max_online_iters: 2
+  max_pretrain_iters: 1
+  n_head: 2
+  n_layer: 2
   num_eval_episodes: 1
   num_online_rollouts: 1
-  num_updates_per_online_iter: 2
-  num_updates_per_pretrain_iter: 2
-  offline_dataset_path: /scratch/epigou/metrics/Exp_3001/
+  num_updates_per_online_iter: 5
+  num_updates_per_pretrain_iter: 5
   online_rtg: -20
   ordering: 0
-  replay_size: 500
-  warmup_steps: 200
+  replay_size: 50
+  warmup_steps: 10
   weight_decay: 0.0005
