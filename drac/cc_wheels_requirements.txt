@@ -1,8 +1,9 @@
-# Full pip freeze — ground truth of the working environment.
-# To install: use cc_wheels.txt and pypi_packages.txt via setup_env.sh
-# Note: Pillow_SIMD is excluded (conflicts with pillow)
-
 absl_py==2.4.0+computecanada
+fonttools==4.63.0
+nvidia-ml-py==13.610.43
+protobuf==7.35.0
+regex==2026.5.9
+zipp==4.1.0
 annotated_doc==0.0.4+computecanada
 anyio==4.13.0+computecanada
 argon2_cffi==25.1.0+computecanada
@@ -14,7 +15,6 @@ attrs==26.1.0+computecanada
 babel==2.18.0+computecanada
 beautifulsoup4==4.14.3+computecanada
 bleach==6.3.0+computecanada
-carbontracker==2.4.5
 certifi==2026.5.20+computecanada
 cffi==2.0.0+computecanada
 charset_normalizer==3.4.7+computecanada
@@ -30,11 +30,9 @@ exceptiongroup==1.3.1+computecanada
 executing==2.2.1+computecanada
 fastjsonschema==2.21.2+computecanada
 filelock==3.29.0+computecanada
-fonttools==4.63.0
 fqdn==1.5.1+computecanada
 fsspec==2026.4.0+computecanada
 future==1.0.0+computecanada
-geocoder==1.38.1
 geographiclib==2.1+computecanada
 geopy==2.4.1+computecanada
 glpk==0.4.7+computecanada
@@ -75,7 +73,6 @@ matplotlib==3.10.0+computecanada
 matplotlib_inline==0.2.2+computecanada
 mdurl==0.1.2+computecanada
 mistune==3.2.0+computecanada
-mplcursors==0.7.1
 mpmath==1.3.0+computecanada
 narwhals==2.21.2+computecanada
 nbclient==0.10.4+computecanada
@@ -85,7 +82,6 @@ nest_asyncio==1.6.0+computecanada
 networkx==3.4.2+computecanada
 notebook_shim==0.2.4+computecanada
 numpy==1.26.4+computecanada
-nvidia-ml-py==13.610.43
 overrides==7.7.0+computecanada
 packaging==26.2+computecanada
 pandas==2.2.3+computecanada
@@ -98,7 +94,6 @@ plotly==6.7.0+computecanada
 ply==3.11+computecanada
 prometheus_client==0.25.0+computecanada
 prompt_toolkit==3.0.52+computecanada
-protobuf==7.35.0
 psutil==7.2.2+computecanada
 ptyprocess==0.7.0+computecanada
 pure_eval==0.2.3+computecanada
@@ -112,12 +107,9 @@ python_dateutil==2.9.0.post0+computecanada
 python_dotenv==1.2.2+computecanada
 python_json_logger==4.1.0+computecanada
 pytz==2026.2+computecanada
-pyvrp==0.11.3
 PyYAML==6.0.2+computecanada
 pyzmq==27.1.0+computecanada
-ratelim==0.1.6
 referencing==0.37.0+computecanada
-regex==2026.5.9
 requests==2.34.2+computecanada
 rfc3339_validator==0.1.4+computecanada
 rfc3986_validator==0.1.1+computecanada
@@ -155,10 +147,8 @@ typing_extensions==4.15.0+computecanada
 tzdata==2026.2+computecanada
 uri_template==1.3.0+computecanada
 urllib3==2.7.0+computecanada
-vrplib==1.5.1
 wcwidth==0.7.0+computecanada
 webcolors==25.10.0+computecanada
 webencodings==0.5.1+computecanada
 websocket_client==1.9.0+computecanada
 werkzeug==3.1.8+computecanada
-zipp==4.1.0
