@@ -4,9 +4,9 @@
 #SBATCH --error=experiments/Exp_9999/error.log
 #SBATCH -A def-mcapretz
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=4
+#SBATCH --cpus-per-task=2
 #SBATCH --time=00:20:00
-#SBATCH --mem=16G
+#SBATCH --mem=8G
 #SBATCH --gpus-per-node=t4:1
 #SBATCH --mail-type=FAIL,TIME_LIMIT,END
 #SBATCH --mail-user=epigou@uwo.ca
