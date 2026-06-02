@@ -18,7 +18,7 @@ echo "Start:  $(date)"
 
 set -e
 
-module load python/3.10 cuda cudnn
+module load python/3.10 cuda/12.2 cudnn
 source ~/envs/merl_env/bin/activate
 
 export OMP_NUM_THREADS=1
