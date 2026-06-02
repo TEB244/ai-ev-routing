@@ -1,7 +1,6 @@
-# Install with: pip install --no-index -r requiriments_drac.txt
-# Then separately (not in CC wheelhouse):
-#   pip install mplcursors pyvrp carbontracker geocoder
-# Note: transformers==4.37.2, torch==2.6.0, tensorboard are available as CC wheels
+# Full pip freeze — ground truth of the working environment.
+# To install: use cc_wheels.txt and pypi_packages.txt via setup_env.sh
+# Note: Pillow_SIMD is excluded (conflicts with pillow)
 
 absl_py==2.4.0+computecanada
 annotated_doc==0.0.4+computecanada
