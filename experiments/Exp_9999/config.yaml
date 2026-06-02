@@ -96,6 +96,7 @@ odt_hyperparameters:
   exp_name: 9999
   init_temperature: 0.1
   learning_rate: 0.0001
+  max_offline_trajectories: 50
   max_online_iters: 2
   max_pretrain_iters: 1
   offline_dataset_path: /scratch/epigou/metrics/Exp_3001/
