@@ -8,6 +8,9 @@ certifi==2025.11.12+computecanada
 charset_normalizer==3.4.4+computecanada
 click==8.3.2
 cma==4.4.4
+mplcursors
+pyvrp
+transformers
 datasets==4.8.4+computecanada
 dill==0.4.1+computecanada
 filelock==3.20.1+computecanada
