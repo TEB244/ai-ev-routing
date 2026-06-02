@@ -7,7 +7,7 @@
 #SBATCH --cpus-per-task=4
 #SBATCH --time=00:20:00
 #SBATCH --mem=16G
-#SBATCH --gpus-per-node=1
+#SBATCH --gpus-per-node=t4:1
 #SBATCH --mail-type=FAIL,TIME_LIMIT,END
 #SBATCH --mail-user=epigou@uwo.ca
 
