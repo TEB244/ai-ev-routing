@@ -7,7 +7,7 @@
 #SBATCH --cpus-per-task=2
 #SBATCH --time=00:20:00
 #SBATCH --mem=8G
-#SBATCH --gpus-per-node=a100:1
+#SBATCH --gpus-per-node=h100:1
 #SBATCH --mail-type=FAIL,TIME_LIMIT,END
 #SBATCH --mail-user=epigou@uwo.ca
 
@@ -23,6 +23,6 @@ source ~/envs/merl_env/bin/activate
 
 export OMP_NUM_THREADS=1
 
-python main.py -e 9999 -server DRAC -g 0
+python main.py -e 9999 -server DRAC
 
 echo "End: $(date)"
