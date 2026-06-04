@@ -5,8 +5,8 @@
 #SBATCH -A def-mcapretz
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=2
-#SBATCH --time=00:20:00
-#SBATCH --mem=8G
+#SBATCH --time=00:10:00
+#SBATCH --mem=40G
 #SBATCH --gpus-per-node=h100:1
 #SBATCH --mail-type=FAIL,TIME_LIMIT,END
 #SBATCH --mail-user=epigou@uwo.ca

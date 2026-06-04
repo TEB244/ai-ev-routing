@@ -95,7 +95,7 @@ odt_hyperparameters:
   dropout: 0.1
   embed_dim: 512
   eval_context_length: 5
-  eval_interval: 1
+  eval_interval: 20
   eval_rtg: -50
   exp_name: 7145
   init_temperature: 0.1
