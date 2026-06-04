@@ -19,7 +19,11 @@
     }
   },
   "CMA": {
-    "cma_parameters": {}
+    "cma_parameters": {
+      "initial_sigma": 0.1,
+      "population_dimension": 20,
+      "max_generations": 200
+    }
   },
   "ODT": {
     "odt_hyperparameters": {
