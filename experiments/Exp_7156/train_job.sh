@@ -4,9 +4,9 @@
 #SBATCH --error=experiments/Exp_7156/error.log
 #SBATCH -A  rrg-kgroling
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=6
-#SBATCH --time=30:00:00
-#SBATCH --mem=12G
+#SBATCH --cpus-per-task=4
+#SBATCH --time=34:00:00
+#SBATCH --mem=64G
 #SBATCH --gpus-per-node=1
 
 #SBATCH --mail-type=FAIL,TIME_LIMIT
@@ -22,10 +22,6 @@ source ~/envs/merl_env/bin/activate
 # Enable multi-threading
 export OMP_NUM_THREADS=4
 
-# Activate Nvidia MPS:
-export CUDA_MPS_PIPE_DIRECTORY=/tmp/nvidia-mps
-export CUDA_MPS_LOG_DIRECTORY=/tmp/nvidia-log
-nvidia-cuda-mps-control -d
 
 
 python main.py -g 0 -e 7156 -d "/home/epigou/scratch/metrics/Exp"

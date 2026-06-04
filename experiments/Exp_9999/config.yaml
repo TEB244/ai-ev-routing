@@ -1,0 +1,113 @@
+algorithm_settings:
+  agent_by_zone: false
+  algorithm: ODT
+cma_parameters:
+  initial_sigma: 0.1
+  max_generations: 2
+  model_type: optimizer
+  population_dimension: 5
+environment_settings:
+  action_dim: 5
+  carbon_save_interval: 2
+  coords:
+  - - 43.02120034946083
+    - -81.28349087468504
+  distance_scale: 100.0
+  distance_weight: 0.0
+  energy_scale: 0.001
+  energy_weight: 1.0
+  ev_rationality: 0.9
+  increase_rate: 12500
+  max_charge:
+  - 170000
+  - 90000
+  - 170000
+  max_mini_sim_steps: 5
+  max_sim_steps: 10
+  models:
+  - Tesla Model Y
+  - BYD Song
+  - Tesla Model 3
+  num_of_cars: 5
+  num_of_chargers: 1
+  radius: 20
+  saving_data_deepness: episode_level
+  season: spring
+  seed: 1234
+  start_sequence: random
+  starting_charge: 6000
+  step_size: 0.01
+  traffic_noise: 3
+  traffic_scale: 1.0
+  traffic_weight: 1.0
+  usage_per_hour:
+  - 9840
+  - 8460
+  - 9360
+eval_config:
+  continue_training: false
+  display_training_times: false
+  evaluate_on_diff_seed: false
+  evaluate_on_diff_zone: false
+  fixed_attributes: []
+  generate_plots: false
+  save_aggregate_rewards: false
+  save_data: true
+  save_offline_data: false
+  save_path_metrics:
+    DRAC: /home/epigou/scratch/metrics/Exp
+    Local: ./_test_metrics/Exp
+  verbose: true
+federated_learning_settings:
+  aggregation_count: 1
+  city_multiplier: 0.15
+  model_multiplier: 0.5
+  zone_multiplier: 0.35
+nn_hyperparameters:
+  average_rewards_when_training: false
+  batch_size: 8
+  buffer_limit: 32
+  city_multiplier: 0.15
+  discount_factor: 0.99
+  eps_per_save: 3
+  epsilon: 1
+  epsilon_decay: 0.999
+  layers:
+  - 64
+  - 32
+  learning_rate: 0.01
+  log_std_decay_rate: 0.01
+  max_num_timesteps: 50
+  model_multiplier: 0.5
+  num_episodes: 3
+  num_epochs: 2
+  target_episode_epsilon_frac: 0.3
+  target_network_update_frequency: 5
+  zone_multiplier: 0.35
+odt_hyperparameters:
+  K: 5
+  activation_function: relu
+  batch_size: 16
+  dropout: 0.1
+  embed_dim: 64
+  eval_context_length: 5
+  eval_interval: 1
+  eval_rtg: -20
+  exp_name: 9999
+  init_temperature: 0.1
+  learning_rate: 0.0001
+  max_offline_trajectories: 50
+  max_online_iters: 2
+  max_pretrain_iters: 1
+  offline_dataset_path: /scratch/epigou/metrics/Exp_3001/
+  n_head: 2
+  n_layer: 2
+  num_eval_episodes: 1
+  num_online_rollouts: 1
+  num_updates_per_online_iter: 5
+  num_updates_per_pretrain_iter: 5
+  online_rtg: -20
+  ordering: 0
+  replay_size: 50
+  warmup_steps: 10
+  weight_decay: 0.0005

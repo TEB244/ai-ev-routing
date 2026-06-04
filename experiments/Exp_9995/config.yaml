@@ -33,7 +33,7 @@ environment_settings:
   - Tesla Model Y
   - BYD Song
   - Tesla Model 3
-  num_of_cars: 10
+  num_of_cars: 100
   num_of_chargers: 1
   radius: 20
   saving_data_deepness: episode_level
@@ -64,7 +64,7 @@ eval_config:
     Local: ./_test_metrics/Exp
   verbose: true
 federated_learning_settings:
-  aggregation_count: 5
+  aggregation_count: 2
   city_multiplier: 0.15
   model_multiplier: 0.5
   zone_multiplier: 0.35
@@ -85,7 +85,7 @@ nn_hyperparameters:
   log_std_decay_rate: 0.01
   max_num_timesteps: 300
   model_multiplier: 0.5
-  num_episodes: 150
+  num_episodes: 15
   num_epochs: 10
   zone_multiplier: 0.35
 odt_hyperparameters:
@@ -102,14 +102,14 @@ odt_hyperparameters:
   learning_rate: 0.0001
   max_offline_trajectories: 50000
   max_pretrain_iters: 2
-  forward_mode: batched
+  forward_mode: sequential
   n_head: 4
   n_layer: 4
   num_eval_episodes: 1
   num_online_rollouts: 1
   num_updates_per_online_iter: 2
   num_updates_per_pretrain_iter: 2
-  offline_dataset_path: /home/epigou/scratch/offline_datasets/Exp_9994/
+  offline_dataset_path: ./_test_metrics/Exp_3001/
   online_rtg: -20
   ordering: 0
   replay_size: 500

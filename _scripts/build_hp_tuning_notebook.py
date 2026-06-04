@@ -106,7 +106,7 @@ EXP_LAYOUT = [
     (9060, 'REINFORCE', 'discount_factor',   [0.90, 0.95, 0.99, 0.995, 0.999]),
     (9075, 'REINFORCE', 'layers_arch',       [[32, 32], [64, 64], [128, 64, 64], [256, 128, 64], [512, 256, 128, 64]]),
     (9090, 'CMA',       'initial_sigma',     [0.01, 0.05, 0.10, 0.30, 1.00]),
-    (9105, 'CMA',       'population_dimension', [10, 20, 40, 80, 160]),
+    (9105, 'CMA',       'population_dimension', [10, 20, 40, 80, 100]),
     (9120, 'CMA',       'max_generations',   [50, 100, 200, 400, 800]),
     (9135, 'ODT',       'learning_rate',     [1.0e-5, 1.0e-4, 1.0e-3, 1.0e-2, 1.0e-1]),
     (9150, 'ODT',       'embed_dim',         [64, 128, 256, 512, 1024]),
@@ -169,7 +169,7 @@ HP_BLOCKS = [
          0.10),
         ('population_dimension',
          ('cma_parameters', 'population_dimension'),
-         [10, 20, 40, 80, 160],
+         [10, 20, 40, 80, 100],   # 100 instead of 160 (160 was too slow on cluster)
          20),
         ('max_generations',
          ('cma_parameters', 'max_generations'),
