@@ -8,9 +8,9 @@ listed at the end of each section.
 
 **Status snapshot** (as of writing):
 - DQN + REINFORCE: bug-fixed, HP-tuned, sensitivity-swept. Findings final.
-- CMA: HP tuning in progress (Santiago); sensitivity sweep complete with old HPs.
-- ODT: HP tuning in progress (Ethan); offline dataset just transferred to Rorqual.
-- Main rerun (4xxx/5xxx/6xxx): pending HP-analysis completion.
+- CMA: HP tuning complete; 7xxx CMA configs already match the tuned recommendations (all three HPs were in 5-way ties so recommendations = centre defaults).
+- ODT: HP tuning complete; offline dataset on Rorqual; 7xxx ODT configs patched.
+- Main rerun (4xxx/5xxx/6xxx): pending — HP-tuned configs and offline data in place, ready to submit.
 
 ---
 
@@ -239,8 +239,14 @@ prose; this is the summary.**
 | **REINFORCE** | `learning_rate` | **0.001** | 4-way tie at upper end |
 | | `discount_factor` | 0.99 | 3-way tie |
 | | `layers` | **[64, 64]** | Smaller than original `[128, 64, 64]`, 4-way tie at top |
-| **CMA** | (3 HPs, pending Santiago) | TBD | initial_sigma, population_dimension, max_generations |
-| **ODT** | (5 HPs, pending Ethan) | TBD | learning_rate, embed_dim, n_layer, K, rtg |
+| **CMA** | `initial_sigma` | 0.1 | All three CMA HPs in 5-way ties — insensitive |
+| | `population_dimension` | 20 | |
+| | `max_generations` | 200 | |
+| **ODT** | `learning_rate` | 0.0001 | Centre, 3-way tie |
+| | `embed_dim` | 512 | 5-way tie, insensitive |
+| | `n_layer` | 4 | 4-way tie, insensitive |
+| | `K` | 10 | 5-way tie, insensitive |
+| | `rtg` (online + eval, paired) | -50 | Slight improvement from -60 |
 
 ### Key insights for the paper
 
