@@ -145,12 +145,15 @@ def main_loop(args):
     if n_gpus == 0:
         devices = ['cpu' for _ in range(n_zones)]
     else:
-        if n_gpus != n_zones:
+        if n_gpus == 1 and algorithm_dm == 'ODT':
+            devices = [gpus[0]] * n_zones
+        elif n_gpus != n_zones:
             raise ValueError(
                 f"GPU count ({n_gpus}) must equal zone count ({n_zones}). "
                 f"Pass one GPU per zone, e.g. -g 0 1 2 3 for 4 zones."
             )
-        devices = gpus
+        else:
+            devices = gpus
         for i, gpu in enumerate(devices):
             print(f'Zone {i} with GPU {gpu} - {torch.cuda.get_device_name(gpu)}')
 

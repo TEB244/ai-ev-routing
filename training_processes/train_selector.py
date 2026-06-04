@@ -83,8 +83,9 @@ def train_route(queue, data_dir, ev_info, experiment_number, chargers, environme
         et = time.time() - st
 
         if verbose:
+            logs_dir = f'{data_dir}_{experiment_number}/logs'
             run_mode = 'Evaluating' if args.eval else "Training" 
-            with open(f'logs/{date}-{run_mode}_logs.txt', 'a') as file:
+            with open(f'{logs_dir}/{date}-{run_mode}_logs.txt', 'a') as file:
                 print(f'Spent {et:.3f} seconds saving results', file=file)  # Print saving time with 3 decimal places
             print(f'Spent {et:.3f} seconds saving results')  # Print saving time with 3 decimal places
 
@@ -96,7 +97,7 @@ def train_route(queue, data_dir, ev_info, experiment_number, chargers, environme
 
         if train_model and num_zones > 1:
             try:
-                barrier.wait(timeout=300)  # 5-minute timeout; raises BrokenBarrierError if a zone crashed
+                barrier.wait(timeout=7200)  # 2-hour timeout; raises BrokenBarrierError if a zone crashed
             except Exception as barrier_err:
                 print(f"[Zone {ind}] Barrier failed (another zone likely crashed): {barrier_err}", flush=True)
                 sys.exit(1)
