@@ -60,7 +60,7 @@ eval_config:
   save_data: true
   save_offline_data: true
   save_path_metrics:
-    DRAC: /home/epigou/scratch/metrics/Exp
+    DRAC: /home/hartman/scratch/metrics/Exp
     Local: ./_test_metrics/Exp
   verbose: true
 federated_learning_settings:
@@ -108,7 +108,7 @@ odt_hyperparameters:
   num_online_rollouts: 1
   num_updates_per_online_iter: 25
   num_updates_per_pretrain_iter: 500
-  offline_dataset_path: /scratch/epigou/metrics/Exp_3001/
+  offline_dataset_path: /scratch/hartman/metrics/Exp_3001/
   online_rtg: -50
   ordering: 0
   replay_size: 500
