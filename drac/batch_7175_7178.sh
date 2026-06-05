@@ -4,10 +4,10 @@
 #SBATCH --error=drac/logs/sens_7175_7178_%j.err
 #SBATCH -A rrg-kgroling
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=16
+#SBATCH --cpus-per-task=5
 #SBATCH --time=34:00:00
 #SBATCH --mem=160G
-#SBATCH --gpus-per-node=1
+#SBATCH --gres=gpu:nvidia_h100_80gb_hbm3_1g.10gb:1
 
 #SBATCH --mail-type=FAIL,TIME_LIMIT
 #SBATCH --mail-user=epigou@uwo.ca
