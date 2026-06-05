@@ -5,8 +5,8 @@
 #SBATCH -A  rrg-kgroling
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=5
-#SBATCH --time=10:00:00
-#SBATCH --mem=40G
+#SBATCH --time=22:00:00
+#SBATCH --mem=20G
 #SBATCH --gres=gpu:nvidia_h100_80gb_hbm3_1g.10gb:1
 
 #SBATCH --mail-type=FAIL,TIME_LIMIT
