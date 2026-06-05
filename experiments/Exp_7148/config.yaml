@@ -95,11 +95,12 @@ odt_hyperparameters:
   dropout: 0.1
   embed_dim: 512
   eval_context_length: 5
-  eval_interval: 1
+  eval_interval: 20
   eval_rtg: -50
   exp_name: 7148
   init_temperature: 0.1
   learning_rate: 0.0001
+  max_offline_trajectories: 600
   max_pretrain_iters: 1
   n_head: 4
   n_layer: 4
@@ -107,7 +108,7 @@ odt_hyperparameters:
   num_online_rollouts: 1
   num_updates_per_online_iter: 25
   num_updates_per_pretrain_iter: 500
-  offline_dataset_path: /scratch/epigou/metrics/Exp_3001/
+  offline_dataset_path: /scratch/hartman/metrics/Exp_3001/
   online_rtg: -50
   ordering: 0
   replay_size: 500

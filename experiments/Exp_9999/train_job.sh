@@ -5,11 +5,11 @@
 #SBATCH -A def-mcapretz
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=2
-#SBATCH --time=00:20:00
-#SBATCH --mem=8G
+#SBATCH --time=00:10:00
+#SBATCH --mem=40G
 #SBATCH --gpus-per-node=h100:1
 #SBATCH --mail-type=FAIL,TIME_LIMIT,END
-#SBATCH --mail-user=epigou@uwo.ca
+#SBATCH --mail-user=lhartma8@uwo.ca
 
 echo "=== Exp_9999 e2e smoke test ==="
 echo "Job ID: $SLURM_JOB_ID"
@@ -19,7 +19,7 @@ echo "Start:  $(date)"
 set -e
 
 module load python/3.10 cuda/12.2 cudnn
-source ~/envs/merl_env2/bin/activate
+source ~/envs/merl_env/bin/activate
 
 export OMP_NUM_THREADS=1
 
