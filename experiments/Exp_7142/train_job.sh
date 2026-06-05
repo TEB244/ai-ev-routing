@@ -10,7 +10,7 @@
 #SBATCH --gres=gpu:nvidia_h100_80gb_hbm3_1g.10gb:1
 
 #SBATCH --mail-type=FAIL,TIME_LIMIT
-#SBATCH --mail-user=epigou@uwo.ca
+#SBATCH --mail-user=lhartma8@uwo.ca
 
 echo "Starting training for experiment 7142"
 
@@ -24,4 +24,4 @@ export OMP_NUM_THREADS=4
 
 
 
-python main.py -g 0 -e 7142 -d "/home/epigou/scratch/metrics/Exp"
+python main.py -g 0 -e 7142 -d "/home/hartman/scratch/metrics/Exp"
