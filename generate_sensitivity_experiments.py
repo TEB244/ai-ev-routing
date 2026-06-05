@@ -262,6 +262,9 @@ python main.py  -e {exp_num} -d "{SCRATCH_PATH[model]}" -eval True
 
 
 def _odt_train(exp_num: int, model: str) -> str:
+    # Wall time: ODT measured ~16.5 sec/episode in a 100ep x 5agg test (~138 min).
+    # At 200 eps x 50 aggs = 10000 total, real time is ~46h. 60h gives ~30%
+    # headroom for variance / longer trajectories.
     return f"""#!/bin/bash
 #SBATCH --job-name=Exp_{exp_num}_train
 #SBATCH --output=experiments/Exp_{exp_num}/output.log
@@ -269,7 +272,7 @@ def _odt_train(exp_num: int, model: str) -> str:
 #SBATCH -A  rrg-kgroling
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=6
-#SBATCH --time=30:00:00
+#SBATCH --time=60:00:00
 #SBATCH --mem=32G
 #SBATCH --gpus-per-node=1
 
