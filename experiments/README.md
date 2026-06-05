@@ -37,7 +37,7 @@ dependency order is:
 | DQN | Lucas Hartman | `hartman` (cluster) / `lhartma8` (mail) | `/home/hartman/scratch/metrics/` |
 | REINFORCE | Lucas Hartman | `hartman` | `/home/hartman/scratch/metrics/` |
 | CMA | Santiago Gomez-Rosero | `sgomezro` | `/home/sgomezro/scratch/metrics/` |
-| ODT | Ethan Pigou | `epigou` | `/home/epigou/scratch/metrics/` |
+| ODT | Lucas Hartman (formerly Ethan Pigou) | `hartman` | `/home/hartman/scratch/metrics/` |
 
 `check_progress.py` and `plot_reward_curve.py` auto-detect the owner
 from the config's algorithm and look in the right scratch path.

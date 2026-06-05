@@ -108,7 +108,7 @@ odt_hyperparameters:
   num_online_rollouts: 1
   num_updates_per_online_iter: 2
   num_updates_per_pretrain_iter: 2
-  offline_dataset_path: /storage_1/metrics/Exp_4024/
+  offline_dataset_path: /scratch/hartman/metrics/Exp_3001/
   online_rtg: -79
   ordering: 0
   replay_size: 500

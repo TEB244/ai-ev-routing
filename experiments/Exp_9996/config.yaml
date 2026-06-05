@@ -98,18 +98,18 @@ odt_hyperparameters:
   eval_interval: 1
   eval_rtg: -20
   exp_name: 9996
+  forward_mode: sequential
   init_temperature: 0.1
   learning_rate: 0.0001
   max_offline_trajectories: 50000
   max_pretrain_iters: 2
-  forward_mode: sequential
   n_head: 4
   n_layer: 4
   num_eval_episodes: 1
   num_online_rollouts: 1
   num_updates_per_online_iter: 2
   num_updates_per_pretrain_iter: 2
-  offline_dataset_path: /home/epigou/scratch/offline_datasets/Exp_9994/
+  offline_dataset_path: /scratch/hartman/metrics/Exp_3001/
   online_rtg: -20
   ordering: 0
   replay_size: 500

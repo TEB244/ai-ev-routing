@@ -52,7 +52,12 @@ class Experiment:
         self.reward_scale = 1
         self.action_range = [-1, 1]
         self.arwt = self.config['nn_hyperparameters']['average_rewards_when_training']
-        self.base_dir = f"saved_networks/Exp_{self.experiment_number}"
+        self.eps_per_save = int(self.config['nn_hyperparameters'].get('eps_per_save', 1))
+        scratch_base = os.path.expanduser("~/scratch/saved_networks")
+        if os.path.isdir(os.path.expanduser("~/scratch")):
+            self.base_dir = os.path.join(scratch_base, f"Exp_{self.experiment_number}")
+        else:
+            self.base_dir = f"saved_networks/Exp_{self.experiment_number}"
 
         # Setup logger
         if self.evaluation:
@@ -294,7 +299,9 @@ class Experiment:
                 total_transitions_sampled=total_transitions_sampled,
                 writer=writer,
             )
-            self.ODTAgent._save_weights(self.logger.log_path, is_offline_model=True)
+            is_last_offline = offline_iter == self.odt_config["max_pretrain_iters"] - 1
+            if (offline_iter + 1) % self.eps_per_save == 0 or is_last_offline:
+                self.ODTAgent._save_weights(self.logger.log_path, is_offline_model=is_last_offline)
 
             offline_iter += 1
             self.tracker.epoch_end()
@@ -466,7 +473,8 @@ class Experiment:
                 total_transitions_sampled=total_transitions_sampled,
                 writer=writer,
             )
-            self.ODTAgent._save_weights(self.logger.log_path, is_offline_model=False)
+            if (online_iter + 1) % self.eps_per_save == 0 or is_last_iter:
+                self.ODTAgent._save_weights(self.logger.log_path, is_offline_model=False)
 
             if is_last_iter:
                 attn_layers = self.ODTAgent.get_attn_layers(self.device)

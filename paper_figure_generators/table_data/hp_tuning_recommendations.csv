@@ -7,9 +7,9 @@ DQN,target_episode_epsilon_frac,0.3,-89.05016134688854,2.9251902667982295,0.3,5 
 REINFORCE,learning_rate,0.001,-92.20995051742393,0.4247619353941503,0.001,4 tied (Occam-broken)
 REINFORCE,discount_factor,0.99,-92.91976938624383,0.9283387009363279,0.99,3 tied (Occam-broken)
 REINFORCE,layers_arch,"[64, 64]",-91.81584457075597,1.2215448126846755,"[128, 64, 64]",4 tied (Occam-broken)
-CMA,initial_sigma,,,,0.1,no data
-CMA,population_dimension,,,,20,no data
-CMA,max_generations,,,,200,no data
+CMA,initial_sigma,0.1,-100.47033721090952,4.268047990604582,0.1,5 tied (Occam-broken)
+CMA,population_dimension,20.0,-100.47033721090952,4.268047990604582,20,5 tied (Occam-broken)
+CMA,max_generations,200.0,-100.47033721090952,4.268047990604582,200,5 tied (Occam-broken)
 ODT,learning_rate,0.0001,-81.29775872957707,13.74786233370901,0.0001,3 tied (Occam-broken)
 ODT,embed_dim,512.0,-81.29775872957707,13.74786233370901,512,5 tied (Occam-broken)
 ODT,n_layer,4.0,-81.29775872957707,13.74786233370901,4,4 tied (Occam-broken)

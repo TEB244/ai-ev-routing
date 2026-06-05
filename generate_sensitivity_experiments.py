@@ -112,7 +112,7 @@ SCRATCH_PATH = {
     "DQN":       "/home/hartman/scratch/metrics/Exp",
     "REINFORCE": "/home/hartman/scratch/metrics/Exp",
     "CMA":       "/home/sgomezro/scratch/metrics/Exp",
-    "ODT":       "/home/epigou/scratch/metrics/Exp",
+    "ODT":       "/home/hartman/scratch/metrics/Exp",   # Lucas took over ODT from Ethan
 }
 
 
@@ -274,7 +274,7 @@ def _odt_train(exp_num: int, model: str) -> str:
 #SBATCH --gpus-per-node=1
 
 #SBATCH --mail-type=FAIL,TIME_LIMIT
-#SBATCH --mail-user=epigou@uwo.ca
+#SBATCH --mail-user=lhartma8@uwo.ca   # Lucas took over ODT from Ethan
 
 echo "Starting training for experiment {exp_num}"
 
@@ -312,7 +312,7 @@ def _odt_eval(exp_num: int, model: str) -> str:
 #SBATCH --gpus-per-node=1
 
 #SBATCH --mail-type=FAIL,TIME_LIMIT
-#SBATCH --mail-user=epigou@uwo.ca
+#SBATCH --mail-user=lhartma8@uwo.ca   # Lucas took over ODT from Ethan
 
 echo "Starting evaluation for experiment {exp_num}"
 
