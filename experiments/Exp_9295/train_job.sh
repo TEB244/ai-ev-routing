@@ -10,7 +10,7 @@
 #SBATCH --gpus-per-node=1
 
 #SBATCH --mail-type=FAIL,TIME_LIMIT
-#SBATCH --mail-user=epigou@uwo.ca
+#SBATCH --mail-user=lhartma8@uwo.ca
 
 echo "Starting training for experiment 9295"
 

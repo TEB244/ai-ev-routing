@@ -9,7 +9,7 @@
 #SBATCH --mem=40G
 #SBATCH --gpus-per-node=h100:1
 #SBATCH --mail-type=FAIL,TIME_LIMIT,END
-#SBATCH --mail-user=epigou@uwo.ca
+#SBATCH --mail-user=lhartma8@uwo.ca
 
 echo "=== Exp_9999 e2e smoke test ==="
 echo "Job ID: $SLURM_JOB_ID"

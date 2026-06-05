@@ -9,7 +9,7 @@
 #SBATCH --mem=12G
 #SBATCH --gpus-per-node=4
 #SBATCH --mail-type=FAIL,TIME_LIMIT,END
-#SBATCH --mail-user=epigou@uwo.ca
+#SBATCH --mail-user=lhartma8@uwo.ca
 
 echo "=== Exp_9995 training ==="
 echo "Job ID: $SLURM_JOB_ID"

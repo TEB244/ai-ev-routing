@@ -10,7 +10,7 @@
 #SBATCH --gpus-per-node=1
 
 #SBATCH --mail-type=FAIL,TIME_LIMIT
-#SBATCH --mail-user=epigou@uwo.ca
+#SBATCH --mail-user=lhartma8@uwo.ca
 
 echo "Starting training for experiment 2122"
 
@@ -28,4 +28,4 @@ export CUDA_MPS_LOG_DIRECTORY=/tmp/nvidia-log
 nvidia-cuda-mps-control -d
 
 
-python main.py -g 0 -e 2122 -d "/home/epigou/scratch/metrics/Exp"
+python main.py -g 0 -e 2122 -d "/home/hartman/scratch/metrics/Exp"
