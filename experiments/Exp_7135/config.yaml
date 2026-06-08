@@ -11,12 +11,12 @@ environment_settings:
   coords:
   - - 43.02120034946083
     - -81.28349087468504
-  - - 42.95923445066671
-    - -81.26016049362336
-  - - 42.98111190139387
-    - -81.30953935839466
-  - - 42.9819404397449
-    - -81.2508736429095
+  # - - 42.95923445066671
+  #   - -81.26016049362336
+  # - - 42.98111190139387
+  #   - -81.30953935839466
+  # - - 42.9819404397449
+  #   - -81.2508736429095
   distance_scale: 100.0
   distance_weight: 0.0
   energy_scale: 0.001
@@ -64,7 +64,7 @@ eval_config:
     Local: /mnt/storage_1/merl/metrics//Exp
   verbose: true
 federated_learning_settings:
-  aggregation_count: 50
+  aggregation_count: 2 #50
   city_multiplier: 0.15
   model_multiplier: 0.5
   zone_multiplier: 0.35
@@ -85,7 +85,7 @@ nn_hyperparameters:
   log_std_decay_rate: 0.01
   max_num_timesteps: 300
   model_multiplier: 0.5
-  num_episodes: 200
+  num_episodes: 10 #80
   num_epochs: 10
   zone_multiplier: 0.35
 odt_hyperparameters:
@@ -114,3 +114,4 @@ odt_hyperparameters:
   replay_size: 500
   warmup_steps: 10000
   weight_decay: 0.0005
+  max_offline_trajectories: 50
