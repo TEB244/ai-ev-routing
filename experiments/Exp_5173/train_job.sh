@@ -5,7 +5,7 @@
 #SBATCH -A  rrg-kgroling
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=6
-#SBATCH --time=60:00:00
+#SBATCH --time=22:00:00
 #SBATCH --mem=32G
 #SBATCH --gpus-per-node=1
 
@@ -28,4 +28,4 @@ export CUDA_MPS_LOG_DIRECTORY=/tmp/nvidia-log
 nvidia-cuda-mps-control -d
 
 
-python main.py -g 0 -e 5173 -d "/home/hartman/scratch/metrics/Exp"
+python main.py -g 0 -e 5173 -d "/home/hartman/links/scratch/metrics/Exp"

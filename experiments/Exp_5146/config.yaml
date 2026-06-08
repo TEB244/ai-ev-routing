@@ -79,7 +79,7 @@ nn_hyperparameters:
   log_std_decay_rate: 0.01
   max_num_timesteps: 300
   model_multiplier: 0.5
-  num_episodes: 200
+  num_episodes: 80
   num_epochs: 10
   zone_multiplier: 0.35
 odt_hyperparameters:
@@ -97,7 +97,7 @@ odt_hyperparameters:
   init_temperature: 0.1
   learning_rate: 0.0001
   log_to_tb: true
-  max_online_iters: 200
+  max_online_iters: 80
   max_pretrain_iters: 1
   n_head: 4
   n_layer: 4

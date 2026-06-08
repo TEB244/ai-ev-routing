@@ -112,7 +112,7 @@ SCRATCH_PATH = {
     "DQN":       "/home/hartman/scratch/metrics/Exp",
     "REINFORCE": "/home/hartman/scratch/metrics/Exp",
     "CMA":       "/home/sgomezro/scratch/metrics/Exp",
-    "ODT":       "/home/hartman/scratch/metrics/Exp",   # Lucas took over ODT from Ethan
+    "ODT":       "/home/hartman/links/scratch/metrics/Exp",   # Lucas took over ODT from Ethan
 }
 
 
@@ -262,9 +262,9 @@ python main.py  -e {exp_num} -d "{SCRATCH_PATH[model]}" -eval True
 
 
 def _odt_train(exp_num: int, model: str) -> str:
-    # Wall time: ODT measured ~16.5 sec/episode in a 100ep x 5agg test (~138 min).
-    # At 200 eps x 50 aggs = 10000 total, real time is ~46h. 60h gives ~30%
-    # headroom for variance / longer trajectories.
+    # Wall time: ODT total episode count is 4000 (e.g. 50 aggs x 80 eps).
+    # At ~16.5 sec/episode (measured in a 100ep x 5agg test = ~138 min),
+    # 4000 episodes is ~18.3h. 22h gives ~20% headroom for variance.
     return f"""#!/bin/bash
 #SBATCH --job-name=Exp_{exp_num}_train
 #SBATCH --output=experiments/Exp_{exp_num}/output.log
@@ -272,7 +272,7 @@ def _odt_train(exp_num: int, model: str) -> str:
 #SBATCH -A  rrg-kgroling
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=6
-#SBATCH --time=60:00:00
+#SBATCH --time=22:00:00
 #SBATCH --mem=32G
 #SBATCH --gpus-per-node=1
 

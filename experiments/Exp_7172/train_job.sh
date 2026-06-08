@@ -5,7 +5,7 @@
 #SBATCH -A  rrg-kgroling
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=5
-#SBATCH --time=60:00:00
+#SBATCH --time=22:00:00
 #SBATCH --mem=20G
 #SBATCH --gres=gpu:nvidia_h100_80gb_hbm3_1g.10gb:1
 
@@ -24,4 +24,4 @@ export OMP_NUM_THREADS=4
 
 
 
-python main.py -g 0 -e 7172 -d "/home/hartman/scratch/metrics/Exp"
+python main.py -g 0 -e 7172 -d "/home/hartman/links/scratch/metrics/Exp"
