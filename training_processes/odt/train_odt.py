@@ -574,7 +574,14 @@ def train_odt(
     
     
     #Initialize agent
-    experiment.init_agent()
+    # experiment.init_agent()
+    try:
+        experiment.init_agent()
+    except RuntimeError as e:
+        if "CUDA-capable device(s) is/are busy" in str(e):
+            pass  # silently skip, experiment continues
+        else:
+            raise
     
     #On first aggregation, load dataset and train offline
     if aggregation_num == 0 and experiment.odt_config["max_pretrain_iters"] > 0:
