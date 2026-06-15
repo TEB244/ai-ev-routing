@@ -579,6 +579,7 @@ def train_odt(
         experiment.init_agent()
     except RuntimeError as e:
         if "CUDA-capable device(s) is/are busy" in str(e):
+            print(f"CUDA-capable device(s) is busy but experiment continues")
             pass  # silently skip, experiment continues
         else:
             raise
