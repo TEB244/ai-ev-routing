@@ -541,13 +541,7 @@ def main_loop(args):
                     print("Started Training Processes")
 
                     for process in processes:
-                        process.join(timeout=3600)
-                    hung = [i for i, p in enumerate(processes) if p.is_alive()]
-                    if hung:
-                        for i in hung:
-                            processes[i].terminate()
-                        raise RuntimeError(f"Zone(s) {hung} did not finish within 3600 s — terminated.")
-
+                        process.join()
                     print("Joined Training Processes")
                     
                     gc.collect()
