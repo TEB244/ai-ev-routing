@@ -1,19 +1,19 @@
 #!/bin/bash
-#SBATCH --job-name=Exp_parallel_train_7136_7138
+#SBATCH --job-name=Exp_parallel_train_7136_7137-fullGPU8
 #SBATCH --output=experiments/parallel/output.log
 #SBATCH --error=experiments/parallel/error.log
 #SBATCH -A def-mcapretz
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=8 #16        # Scale up: ~4-6 CPUs per experiment
-#SBATCH --time=00:05:00
-#SBATCH --mem=20G                  # Scale up: ~12G per experiment x4
-#SBATCH --gres=gpu:nvidia_h100_80gb_hbm3_1g.10gb:1
+#SBATCH --cpus-per-task=32	#12        # Scale up: ~4-6 CPUs per experiment
+#SBATCH --time=01:00:00
+#SBATCH --mem=96G		#36G                  # Scale up: ~12G per experiment x4
+#SBATCH --gpus-per-node=1	#--gres=gpu:nvidia_h100_80gb_hbm3_1g.10gb:1
 
 
 
 # ─── Configuration ────────────────────────────────────────────────────────────
 # List all experiment IDs to run in parallel on the same GPU
-EXPERIMENTS=(7135 7136)
+EXPERIMENTS=(7135 7136 7137 7138 7139 7140 7141 7142)
 DATA_DIR="/home/sgomezro/scratch/metrics/Exp"
 LOGS_DIR="parallel_tests"
 # ──────────────────────────────────────────────────────────────────────────────
@@ -28,7 +28,7 @@ source ~/envs/merl_env/bin/activate
 # Enable multi-threading (shared across all processes)
 export OMP_NUM_THREADS=2           # Lower per-process since sharing CPUs
 
-# Activate Nvidia MPS — allows multiple CUDA processes to share one GPU
+# # Activate Nvidia MPS — allows multiple CUDA processes to share one GPU
 export CUDA_MPS_PIPE_DIRECTORY=/tmp/nvidia-mps
 export CUDA_MPS_LOG_DIRECTORY=/tmp/nvidia-log
 nvidia-cuda-mps-control -d
@@ -49,8 +49,8 @@ for EXP_ID in "${EXPERIMENTS[@]}"; do
     echo "Launching experiment ${EXP_ID}..."
     sleep $((i * 30))    # 0s, 30s, 60s, 90s stagger
     python main.py -g 0 -e "${EXP_ID}" -d "${DATA_DIR}" \
-        > "${LOGS_DIR}/Exp_${EXP_ID}/parallel_output.log" \
-        2> "${LOGS_DIR}/Exp_${EXP_ID}/parallel_error.log" &
+        > "${LOGS_DIR}/Exp_${EXP_ID}/parallel_fullgpu8_output.log" \
+        2> "${LOGS_DIR}/Exp_${EXP_ID}/parallel_fullgpu8_error.log" &
     PIDS+=($!)
     sleep 3                        # Small stagger to avoid race conditions at startup
 done
