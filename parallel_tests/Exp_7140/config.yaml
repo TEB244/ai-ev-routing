@@ -18,7 +18,7 @@ environment_settings:
   - - 42.9819404397449
     - -81.2508736429095
   distance_scale: 100.0
-  distance_weight: 0.0
+  distance_weight: 1.0
   energy_scale: 0.001
   energy_weight: 1.0
   ev_rationality: 0.9
@@ -38,7 +38,7 @@ environment_settings:
   radius: 20
   saving_data_deepness: episode_level
   season: spring
-  seed: 5555
+  seed: 2020
   start_sequence: random
   starting_charge: 6000
   step_size: 0.01
@@ -85,7 +85,7 @@ nn_hyperparameters:
   log_std_decay_rate: 0.01
   max_num_timesteps: 300
   model_multiplier: 0.5
-  num_episodes: 100 #80
+  num_episodes: 100 #80 
   num_epochs: 10
   zone_multiplier: 0.35
 odt_hyperparameters:
@@ -97,7 +97,7 @@ odt_hyperparameters:
   eval_context_length: 5
   eval_interval: 20
   eval_rtg: -50
-  exp_name: 7136
+  exp_name: 7140
   init_temperature: 0.1
   learning_rate: 0.0001
   max_offline_trajectories: 600
@@ -114,4 +114,3 @@ odt_hyperparameters:
   replay_size: 500
   warmup_steps: 10000
   weight_decay: 0.0005
-  #max_offline_trajectories: 50

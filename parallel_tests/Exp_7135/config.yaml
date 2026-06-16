@@ -64,7 +64,7 @@ eval_config:
     Local: /mnt/storage_1/merl/metrics//Exp
   verbose: true
 federated_learning_settings:
-  aggregation_count: 2 #50
+  aggregation_count: 5 #50
   city_multiplier: 0.15
   model_multiplier: 0.5
   zone_multiplier: 0.35
@@ -85,7 +85,7 @@ nn_hyperparameters:
   log_std_decay_rate: 0.01
   max_num_timesteps: 300
   model_multiplier: 0.5
-  num_episodes: 10 #100 #80
+  num_episodes: 100 #80
   num_epochs: 10
   zone_multiplier: 0.35
 odt_hyperparameters:
@@ -114,4 +114,4 @@ odt_hyperparameters:
   replay_size: 500
   warmup_steps: 10000
   weight_decay: 0.0005
-  max_offline_trajectories: 50
+  # max_offline_trajectories: 50
