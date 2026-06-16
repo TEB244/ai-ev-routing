@@ -27,12 +27,12 @@ def save_job_power_usage(job, experiment_num, username, base_path):
                 'Sec-Fetch-Dest': 'document','Sec-Fetch-Mode': 'navigate', 'Sec-Fetch-Site': 'none', 'Sec-Fetch-User': '?1', \
                 'Cache-Control': 'max-age=0'}
 
-    power_url = f"https://portail.beluga.calculquebec.ca/secure/jobstats/{username}/{job['id_job']}/graph/power.json"
+    power_url = f"https://portail.narval.calculquebec.ca/secure/jobstats/{username}/{job['id_job']}/graph/power.json"
     print(f"Making request to {power_url}")
     power_get = urllib.request.urlopen(urllib.request.Request(power_url, headers=headers))
     power_data = json.loads(power_get.read())
 
-    co2_url = f"https://portail.beluga.calculquebec.ca/secure/jobstats/{username}/{job['id_job']}/value/cost.json"
+    co2_url = f"https://portail.narval.calculquebec.ca/secure/jobstats/{username}/{job['id_job']}/value/cost.json"
     print(f"Making request to {co2_url}")
     co2_get = urllib.request.urlopen(urllib.request.Request(co2_url, headers=headers))
     co2_data = json.loads(co2_get.read())
@@ -65,7 +65,7 @@ def get_jobs_per_experiments(experiment_list, username, base_path):
         base_path (str): Base path to save the CSV file
     """
 
-    url = f"https://portail.beluga.calculquebec.ca/api/jobs/?format=datatables&username={username}&length=2000"
+    url = f"https://portail.narval.calculquebec.ca/api/jobs/?format=datatables&username={username}&length=2000"
 
     print(f"Making request to {url}")
 
