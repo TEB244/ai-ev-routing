@@ -21,6 +21,11 @@ Examples:
     python paper_figure_generators/plot_reward_curve.py 7045 \\
         --window 250 --out my_check.png
 
+    # ODT logs a greedy rollout + a greedy eval per online iter. By default
+    # ODT is plotted as the eval stream only; override with --phase:
+    python paper_figure_generators/plot_reward_curve.py 4108 --phase eval
+    python paper_figure_generators/plot_reward_curve.py 4108 --phase all
+
     # Open the figure window interactively (local machine only)
     python paper_figure_generators/plot_reward_curve.py 7000 --show
 
@@ -127,6 +132,34 @@ def rolling_mean(values, window):
     return pad + out
 
 
+def deinterleave_stream(pairs, means, which):
+    """Pick one of ODT's two interleaved episode streams.
+
+    ODT logs two episodes per online iter: a data-collection ROLLOUT
+    (pre-update weights, logged first) and a post-update EVAL. With
+    eval_interval=1 they strictly alternate within each aggregation, so:
+        rollout -> even positions (0, 2, 4, ...)
+        eval    -> odd  positions (1, 3, 5, ...)
+    NOTE: both passes use the greedy mean action (use_mean is a no-op in
+    vec_evaluate_episode_rtg), so neither is exploratory and the converged
+    value is robust even if the alternation is imperfect at aggregation 0.
+    This just de-interleaves to one clean evaluation curve.
+    """
+    from collections import defaultdict
+    by_agg = defaultdict(list)
+    for (agg, ep), m in zip(pairs, means):
+        by_agg[agg].append((ep, m))
+    start = 1 if which == "eval" else 0
+    out_pairs, out_means = [], []
+    for agg in sorted(by_agg):
+        rows = sorted(by_agg[agg])           # sort by episode within the aggregation
+        for i in range(start, len(rows), 2):
+            ep, m = rows[i]
+            out_pairs.append((agg, ep))
+            out_means.append(m)
+    return out_pairs, out_means
+
+
 # -------------------------------------------------------- expected episode count
 def get_expected_episodes(cfg):
     algo = cfg["algorithm_settings"]["algorithm"]
@@ -153,6 +186,9 @@ def main():
     p.add_argument("--metrics-root", help="Override metrics root directory")
     p.add_argument("--out", help="Output PNG path (default: paper_figure_generators/figures/exp_<N>_reward_curve.png)")
     p.add_argument("--window", type=int, help="Rolling-mean window in episodes (default: ~2%% of episodes)")
+    p.add_argument("--phase", choices=["eval", "rollout", "all"],
+                   help="ODT logs a greedy rollout + a greedy eval per online iter. "
+                        "Which stream to plot. Default: 'eval' for ODT, 'all' otherwise.")
     p.add_argument("--show", action="store_true", help="Open figure interactively (needs a display)")
     p.add_argument("--dpi", type=int, default=180, help="Output DPI (default 180)")
     args = p.parse_args()
@@ -191,11 +227,26 @@ def main():
 
     print(f"Scanning {csv_path} ...")
     pairs, means = scan_csv(csv_path)
-    n = len(pairs)
-    if n == 0:
+    if len(pairs) == 0:
         print(f"ERROR: no episode data in CSV", file=sys.stderr)
         return 1
 
+    # ODT logs two greedy passes per online iter (data-collection rollout +
+    # post-update eval); both use the greedy mean action. Default to the eval
+    # (greedy evaluation) stream so ODT is scored on a single clean pass.
+    phase = args.phase or ("eval" if algo == "ODT" else "all")
+    if algo == "ODT" and phase in ("eval", "rollout"):
+        doubled = bool(expected_eps) and len(pairs) >= 1.5 * expected_eps
+        if doubled:
+            pairs, means = deinterleave_stream(pairs, means, phase)
+            print(f"[ODT] doubled logging detected -> showing '{phase}' (greedy) stream: "
+                  f"{len(pairs)} episodes")
+        else:
+            print(f"[ODT] no 2x logging detected (n={len(pairs)}, expected={expected_eps}); "
+                  f"plotting all episodes as-is")
+            phase = "all"
+
+    n = len(pairs)
     pct = (n / expected_eps * 100) if expected_eps else None
 
     # Compute summary stats
@@ -246,7 +297,8 @@ def main():
                 ha="left", va="center")
 
     # Title
-    title_parts = [f"Exp_{args.exp_num}", f"{algo}", f"seed={seed}", f"zones={num_zones}"]
+    algo_label = f"{algo} ({phase})" if (algo == "ODT" and phase in ("eval", "rollout")) else algo
+    title_parts = [f"Exp_{args.exp_num}", algo_label, f"seed={seed}", f"zones={num_zones}"]
     if expected_eps:
         title_parts.append(f"{n}/{expected_eps} eps ({pct:.0f}%)")
     else:
@@ -258,14 +310,18 @@ def main():
     ax.legend(loc="lower right")
 
     plt.tight_layout()
+    default_name = f"exp_{args.exp_num}_reward_curve.png"
+    if algo == "ODT" and phase in ("eval", "rollout"):
+        default_name = f"exp_{args.exp_num}_reward_curve_{phase}.png"
     out_path = (Path(args.out) if args.out
-                else REPO_ROOT / "paper_figure_generators" / "figures"
-                     / f"exp_{args.exp_num}_reward_curve.png")
+                else REPO_ROOT / "paper_figure_generators" / "figures" / default_name)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     plt.savefig(out_path, dpi=args.dpi, bbox_inches="tight")
     print(f"Saved {out_path}")
     print()
     print(f"  algorithm:           {algo}")
+    if algo == "ODT":
+        print(f"  stream:              {phase}  (greedy; ODT logs rollout+eval per iter)")
     print(f"  seed:                {seed}")
     print(f"  zones:               {num_zones}")
     print(f"  episodes recorded:   {n}" + (f" / {expected_eps} ({pct:.1f}%)" if expected_eps else ""))
