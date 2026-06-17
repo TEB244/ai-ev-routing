@@ -51,9 +51,10 @@ config_odt = {
 # ──────────────────────────────────────────────────────────────────────────────
 
 
-def generate_script(config, experiment_list) -> str:
+def generate_script(config, experiment_bounds) -> str:
     """Generate the SLURM batch script as a string."""
 
+    experiment_list = list(range(experiment_bounds[0], experiment_bounds[1] + 1))
     job_name = f"Exp_parallel_train_{experiment_list[0]}_{experiment_list[-1]}-GPUH100"
     exp_array = " ".join(str(e) for e in experiment_list)
 
@@ -65,7 +66,7 @@ def generate_script(config, experiment_list) -> str:
     else:
         data_dir = f"/home/{drac_username}/{config['data_dir']}"
     # Build SBATCH directives
-    experiment_size = experiment_list[-1] - experiment_list[0] + 1
+    experiment_size = len(experiment_list)
     cpus_per_task = config['cpu_per_experiment']*experiment_size
     mem = config['mem_per_experiment']*experiment_size*(1.2 if experiment_size < 4 else 1)
     time = config['time']
