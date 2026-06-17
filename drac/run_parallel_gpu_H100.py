@@ -83,7 +83,7 @@ def generate_script(config, experiment_list) -> str:
         f"#SBATCH --ntasks={config['ntasks']}",
         f"#SBATCH --cpus-per-task={cpus_per_task}",
         f"#SBATCH --time={time}",
-        f"#SBATCH --mem={mem}G",
+        f"#SBATCH --mem={int(mem)}G",
         f"#SBATCH --gpus={config['gpus']}",
         "",
         "",
