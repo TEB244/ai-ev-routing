@@ -5,8 +5,8 @@
 #SBATCH -A def-mcapretz
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=5
-#SBATCH --time=15:00:00
-#SBATCH --mem=6G
+#SBATCH --time=18:30:00
+#SBATCH --mem=3584M
 
 
 echo "Starting training for experiment 4076"
