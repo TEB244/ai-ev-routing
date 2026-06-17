@@ -19,5 +19,5 @@ source ~/envs/merl_env/bin/activate
 # Enable multi-threading
 export OMP_NUM_THREADS=2
 
-python main.py  -e 4075 -d "/home/sgomezro/scratch/metrics/Exp" -verb True
+python main.py  -e 4075 -d "/home/sgomezro/links/scratch/metrics/Exp" -verb True
     
