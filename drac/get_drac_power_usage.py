@@ -66,7 +66,6 @@ def save_job_power_usage(job, experiment_num, username, base_path, host):
         for x, y in zip(power_data['data'][0]['x'], power_data['data'][0]['y']):
             f.write(f'{x},{y},{co2_data["co2_emissions_kg"]}\n')
 
-
 def get_jobs_per_experiments(experiment_list, username, base_path, host, length):
     """Pull power+CO2 for every experiment in [start, end]."""
     url = f"https://{host}/api/jobs/?format=datatables&username={username}&length={length}"
