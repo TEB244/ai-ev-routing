@@ -42,7 +42,7 @@ config_general = {
 }
 config_odt = {
     "batch_size": 8,
-    "time": "02:00:00",
+    "time": "01:00:00",
     "cpu_per_experiment": 4,
     "mem_per_experiment": 10,
     "gpus": "h100:1",
@@ -72,6 +72,7 @@ def generate_script(config, experiment_list) -> str:
     output_dir = config['parallel_dir'] + f"batch_train_{experiment_list[0]}-{experiment_list[-1]}"
     output_log = output_dir + "/output.log"
     error_log = output_dir + "/error.log"
+    parallel_dir = config['parallel_dir']
 
     lines = [
         "#!/bin/bash",
@@ -89,7 +90,7 @@ def generate_script(config, experiment_list) -> str:
         "# ─── Configuration ────────────────────────────────────────────────────────────",
         f"EXPERIMENTS=({exp_array})",
         f'DATA_DIR="{data_dir}"',
-        f'LOGS_DIR="{config['parallel_dir']}"',
+        f'LOGS_DIR="{parallel_dir}"',
         "# ──────────────────────────────────────────────────────────────────────────────",
         "",
         'echo "Starting parallel training for experiments: ${EXPERIMENTS[*]}"',
