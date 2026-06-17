@@ -2,19 +2,25 @@ import subprocess
 import argparse
 import yaml
 import os
+from run_parallel_gpu_H100 import run_parallel_gpu_H100
 
-def run_exp_on_drac(start_experiment, end_experiment, algorithm=None, eval=False, seed=None, aggregation=None):
+def run_exp_on_drac(experiments_list, algorithm=None, eval=False, seed=None, aggregation=None):
     """
     Run experiments using the servers from the Digital Research Alliance of Canada (DRAC)
 
     Parameters:
-        start_experiment (int): Start experiment number
-        end_experiment (int): End experiment number
+        experiments_list (list): List of experiment numbers to run
         algorithm (str): Algorithm to run
         eval (bool): Whether to evaluate the model
         seed (int): Seed to run
         aggregation (int): Aggregation count to run
     """
+    start_experiment = experiments_list[0]
+    end_experiment = experiments_list[-1]
+    if algorithm:
+        print(f"Running experiments in range {start_experiment} to {end_experiment} using ONLY algorithm {algorithm}")
+    else:
+        print(f"Running experiments in range {start_experiment} to {end_experiment}")
 
     for experiment_number in range(start_experiment, end_experiment + 1):
         try:
@@ -58,14 +64,20 @@ if __name__ == "__main__":
     parser.add_argument('-s', '--seed', type=str, default=None, help='Seed to run.')
     parser.add_argument('-agg', '--aggregation', type=str, default=None, help='Aggregation count to run.')
     parser.add_argument('-eval', type=bool, default=False, help="Evaluate the model")
+    parser.add_argument('-pgpu','--parallel_gpu', type=str, default=None, help="Run in parallel on the same GPU, depending on the GPU type (H100, A100, V100, etc.)")
     args = parser.parse_args()
 
-    start_experiment = args.experiments_list[0]
-    end_experiment = args.experiments_list[-1]
 
-    if args.algorithm:
-        print(f"Running experiments in range {start_experiment} to {end_experiment} using ONLY algorithm {args.algorithm}")
+    if args.parallel_gpu == None:
+        print('Running experiments on DRAC single experiment per job')
+        run_exp_on_drac(args.experiments_list, args.algorithm, args.eval, args.seed, args.aggregation)
+    elif args.parallel_gpu == "H100":
+        if len(args.experiments_list) > 4:
+            print(f'Running experiments in parallel with GPU H100')
+            run_parallel_gpu_H100(args.experiments_list, args.algorithm, args)
+        else:
+            print(f'Submitting single experiment per job as the number of experiments is less than 4 for H100 GPU.')
+            run_exp_on_drac(args.experiments_list, args.algorithm, args.eval, args.seed, args.aggregation)
     else:
-        print(f"Running experiments from {start_experiment} to {end_experiment}")
-
-    run_exp_on_drac(start_experiment, end_experiment, args.algorithm, args.eval, args.seed, args.aggregation)
+        print(f"{args.parallel_gpu} not implemented yet or not valid entry. Exiting...")
+        exit(1)
