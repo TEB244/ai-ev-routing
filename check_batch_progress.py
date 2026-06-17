@@ -127,23 +127,34 @@ def main():
     p.add_argument("--verbose", action="store_true", help="one row per experiment")
     p.add_argument("--done-pct", type=float, default=99.0, help="%% complete to call DONE")
     p.add_argument("--margin", type=float, default=1.3, help="safety multiplier on recommended wall")
+    p.add_argument("--incomplete-only", action="store_true",
+                   help="print ONLY the experiment numbers that aren't DONE (one per line, "
+                        "for piping into an sbatch loop); table/summary go to stderr")
+    p.add_argument("--exclude-algo", nargs="*", default=[],
+                   help="skip experiments for these algorithms, e.g. --exclude-algo CMA "
+                        "(CMA runs on another user's scratch and won't be on huron)")
     args = p.parse_args()
 
     root = resolve_root(args.metrics_root)
     if root is None:
         print("ERROR: no metrics root found.", file=sys.stderr)
         return 1
-    print(f"Metrics root: {root}\n")
+
+    # In --incomplete-only mode, all human-readable output goes to stderr so
+    # stdout is a clean list of experiment numbers to pipe into sbatch.
+    out = sys.stderr if args.incomplete_only else sys.stdout
+    exclude = {a.upper() for a in (args.exclude_algo or [])}
+    print(f"Metrics root: {root}\n", file=out)
 
     ranges = parse_ranges(args.ranges)
-    # per-DM aggregation of needed-wall estimates (valid partials only)
-    need = {}        # algo -> max needed seconds
-    counts = {}      # algo -> {done, partial, early, nodata}
+    need = {}          # algo -> max needed seconds
+    counts = {}        # algo -> {done, partial, early, nodata}
+    incomplete = []    # exp numbers that are not DONE (need running)
 
     if args.verbose:
         print(f"{'Exp':>6} {'algo':>9} {'season':>7} {'aggs':>9} {'episodes':>15} "
-              f"{'%':>6} {'wall':>6} {'need~':>7} status")
-        print("-" * 86)
+              f"{'%':>6} {'wall':>6} {'need~':>7} status", file=out)
+        print("-" * 86, file=out)
 
     for a, b in ranges:
         for n in range(a, b + 1):
@@ -152,6 +163,8 @@ def main():
                 continue
             cfg = yaml.safe_load(open(cfg_p))
             algo = cfg["algorithm_settings"]["algorithm"]
+            if algo.upper() in exclude:
+                continue
             season = cfg["environment_settings"].get("season", "?")
             total, aggs, per = expected_episodes(cfg)
             wall = wall_seconds(REPO / "experiments" / f"Exp_{n}")
@@ -160,9 +173,10 @@ def main():
             csv_p = root / f"Exp_{n}" / "train" / "metrics_agent_episode_level.csv"
             if not csv_p.exists():
                 counts[algo]["nodata"] += 1
+                incomplete.append(n)
                 if args.verbose:
                     print(f"{n:>6} {algo:>9} {season:>7} {'-':>9} {'no csv':>15} "
-                          f"{'-':>6} {fmt_h(wall):>6} {'-':>7} NO DATA")
+                          f"{'-':>6} {fmt_h(wall):>6} {'-':>7} NO DATA", file=out)
                 continue
 
             actual, max_agg = scan_episodes(csv_p)
@@ -179,36 +193,44 @@ def main():
                 status = "EARLY-EXIT(!)"     # likely watchdog/crash, not wall
                 counts[algo]["early"] += 1
                 need_s = None
+                incomplete.append(n)
             else:
                 status = "PARTIAL"
                 counts[algo]["partial"] += 1
                 need_s = (wall / frac) if (wall and frac > 0) else None
                 if need_s:
                     need[algo] = max(need.get(algo, 0), need_s)
+                incomplete.append(n)
 
             if args.verbose:
                 print(f"{n:>6} {algo:>9} {season:>7} {aggs_str:>9} {eps_str:>15} "
-                      f"{pct:>5.0f}% {fmt_h(wall):>6} {fmt_h(need_s):>7} {status}")
+                      f"{pct:>5.0f}% {fmt_h(wall):>6} {fmt_h(need_s):>7} {status}", file=out)
 
-    print("\n" + "=" * 60)
-    print(f"{'algo':>9}  {'done':>5} {'partial':>8} {'early(!)':>9} {'nodata':>7}")
-    print("-" * 60)
+    print("\n" + "=" * 60, file=out)
+    print(f"{'algo':>9}  {'done':>5} {'partial':>8} {'early(!)':>9} {'nodata':>7}", file=out)
+    print("-" * 60, file=out)
     for algo, c in sorted(counts.items()):
-        print(f"{algo:>9}  {c['done']:>5} {c['partial']:>8} {c['early']:>9} {c['nodata']:>7}")
-    print("=" * 60)
+        print(f"{algo:>9}  {c['done']:>5} {c['partial']:>8} {c['early']:>9} {c['nodata']:>7}", file=out)
+    print("=" * 60, file=out)
 
-    print("\nRECOMMENDED WALL TIME for the next batch (from partial-run estimates):")
-    if not need:
-        print("  (no usable partial runs — every run either finished or exited early.)")
-    for algo, secs in sorted(need.items()):
-        rec_h = (secs * args.margin) / 3600
-        rec_h = int(rec_h) + 1            # round up to whole hours
-        print(f"  {algo:>9}: worst partial needed ~{secs/3600:.1f}h  ->  set ~{rec_h}h  "
-              f"(x{args.margin} margin)")
-    if any(c["early"] for c in counts.values()):
-        print("\n(!) EARLY-EXIT runs are NOT wall-time failures (tiny progress) -- likely the")
-        print("    per-aggregation watchdog or a crash. Check their error.log; fix the cause,")
-        print("    not the wall. (The watchdog scaling fix in main.py addresses the 1-agg case.)")
+    if not args.incomplete_only:
+        print("\nRECOMMENDED WALL TIME for the next batch (from partial-run estimates):")
+        if not need:
+            print("  (no usable partial runs — every run either finished or exited early.)")
+        for algo, secs in sorted(need.items()):
+            rec_h = int((secs * args.margin) / 3600) + 1   # round up to whole hours
+            print(f"  {algo:>9}: worst partial needed ~{secs/3600:.1f}h  ->  set ~{rec_h}h  "
+                  f"(x{args.margin} margin)")
+        if any(c["early"] for c in counts.values()):
+            print("\n(!) EARLY-EXIT runs are NOT wall-time failures (tiny progress) -- likely the")
+            print("    per-aggregation watchdog or a crash. Check their error.log; fix the cause,")
+            print("    not the wall. (The watchdog scaling fix in main.py addresses the 1-agg case.)")
+
+    if args.incomplete_only:
+        incs = sorted(set(incomplete))
+        print(f"\n{len(incs)} experiment(s) not DONE -> need running:", file=out)
+        for n in incs:
+            print(n)   # stdout: clean list for piping
     return 0
 
 
