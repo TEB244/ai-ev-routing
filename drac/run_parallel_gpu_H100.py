@@ -185,7 +185,7 @@ def submit_job(script_path: Path) -> None:
         sys.exit(result.returncode)
 
 
-def run_parallel_gpu_H100(exp_list: list, algorithm: str, args: argparse.Namespace) -> None:
+def run_parallel_gpu_H100(exp_list: list, algorithm: str, args: argparse.Namespace = None) -> None:
     
     if algorithm == 'ODT':
         config = {**config_general, **config_odt}
@@ -199,15 +199,15 @@ def run_parallel_gpu_H100(exp_list: list, algorithm: str, args: argparse.Namespa
 
         script_path = write_script(script_content, f"{config['parallel_dir']}batch_job/job_{experiment_list[0]}-{experiment_list[-1]}.sh")
 
-        if args.dry_run:
+        if hasattr(args, "dry_run") and args.dry_run == True:
             print("─── Generated SLURM script (dry run) ───────────────────────────────────────")
             print(script_content)
             print("─────────────────────────────────────────────────────────────────────────────")
             print(f" Dry run — script saved at {script_path}.")
-            return
-        else:
+        else:   
             print(f"Submitting job {script_path}...")
             submit_job(script_path)
+            
 
 
 if __name__ == "__main__":
