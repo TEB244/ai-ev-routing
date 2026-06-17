@@ -45,7 +45,7 @@ config_odt = {
     "time": "01:00:00",
     "cpu_per_experiment": 4,
     "mem_per_experiment": 10,
-    "gpus": "h100:1",
+    "gpus": 1,
 }
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -65,7 +65,7 @@ def generate_script(config, experiment_list) -> str:
     else:
         data_dir = f"/home/{drac_username}/{config['data_dir']}"
     # Build SBATCH directives
-    experiment_size = len(experiment_list)
+    experiment_size = experiment_list[-1] - experiment_list[0] + 1
     cpus_per_task = config['cpu_per_experiment']*experiment_size
     mem = config['mem_per_experiment']*experiment_size*(1.2 if experiment_size < 4 else 1)
     time = config['time']
@@ -84,7 +84,7 @@ def generate_script(config, experiment_list) -> str:
         f"#SBATCH --cpus-per-task={cpus_per_task}",
         f"#SBATCH --time={time}",
         f"#SBATCH --mem={int(mem)}G",
-        f"#SBATCH --gpus={config['gpus']}",
+        f"#SBATCH ----gpus-per-node={config['gpus']}",
         "",
         "",
         "# ─── Configuration ────────────────────────────────────────────────────────────",
