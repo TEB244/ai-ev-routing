@@ -17,7 +17,8 @@ for exp_num in range(exp_range[0], exp_range[1]+1):
     # train_job = train_job.replace("--mem=1792M", "--mem=1608M")
     # train_job = train_job.replace("--mem=6G", "--mem=3584M")
     # train_job = train_job.replace("--time=*", "--time=18:30:00")
-    train_job = re.sub(r'--time=\d{2}:\d{2}:\d{2}', '--time=18:30:00', train_job)
+    # train_job = re.sub(r'--time=\d{2}:\d{2}:\d{2}', '--time=18:30:00', train_job)
+    train_job = train_job.replace("/sgomezro", "/sgomezro/links")
 
     # Save train_job.sh
     with open(os.path.join(exp_dir, "train_job.sh"), "w") as f:
