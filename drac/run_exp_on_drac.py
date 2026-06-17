@@ -72,8 +72,8 @@ if __name__ == "__main__":
         print('Running experiments on DRAC single experiment per job')
         run_exp_on_drac(args.experiments_list, args.algorithm, args.eval, args.seed, args.aggregation)
     elif args.parallel_gpu == "H100":
-        if len(args.experiments_list) > 4:
-            print(f'Running experiments in parallel with GPU H100')
+        if args.experiments_list[-1] - args.experiments_list[0] + 1 > 4:
+            print(f'Running experiments {args.experiments_list[0]}-{args.experiments_list[-1]} in parallel with GPU H100')
             run_parallel_gpu_H100(args.experiments_list, args.algorithm, args)
         else:
             print(f'Submitting single experiment per job as the number of experiments is less than 4 for H100 GPU.')
