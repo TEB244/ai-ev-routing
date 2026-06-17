@@ -1,51 +1,45 @@
 #!/usr/bin/env python3
 """
-Sum total kWh and CO2e across experiments' CarbonTracker output.
+Sum total kWh and CO2e across experiments from DRAC portal power data.
 
-Each experiment writes <root>/Exp_<N>/train/metrics_sustainability_episode.csv
-with one row per (episode, zone, aggregation) and columns:
-    kwh  -- kWh consumed that episode
-    co2  -- grams CO2e that episode   (may be blank/None on DRAC nodes,
-            which often can't resolve grid carbon intensity)
+Reads <root>/Exp_<N>/train/power_and_co2_metrics.csv (written by
+drac/get_drac_power_usage.py) with columns:
+    time   -- timestamp of each power sample (parseable by pandas)
+    power  -- node power draw in Watts at that sample
+    co2    -- total CO2 for the WHOLE job in kg (same value every row)
 
-This sums kwh and co2 over every row of every experiment in the requested
-ranges and prints per-range subtotals plus one grand total. Stdlib only, so
-it runs anywhere (no pandas needed).
+Per experiment:
+    energy (kWh) = trapezoidal integral of power(W) over time(s) / 3.6e6
+    CO2e   (kg)  = the single co2 value (it's already a whole-job total)
+Then summed over every experiment in the requested ranges.
+
+(This reads the DRAC-portal file, NOT the CarbonTracker
+metrics_sustainability_episode.csv, which is missing/disabled for several
+algorithms on DRAC.)
 
 Usage:
-    # Default: 7xxx + 9xxx, auto-detect metrics root
-    python sum_emissions.py
-
-    # Explicit ranges (mix of NNNN-NNNN, single Exp, or "Nxxx" shorthand)
+    python sum_emissions.py                                  # 7xxx + 9xxx
     python sum_emissions.py --ranges 7000-7179 9000-9251
-
-    # Point at a specific download dir
-    python sum_emissions.py --metrics-root /storage_1/metrics_emissions
-
-    # Per-experiment breakdown, not just totals
-    python sum_emissions.py --verbose
-
-    # If co2 is missing/zero, estimate CO2e = kwh * intensity (gCO2e/kWh).
-    # Quebec hydro grid (Narval/Rorqual) is ~1.5; pass your own if known.
-    python sum_emissions.py --intensity 1.5
+    python sum_emissions.py --metrics-root /storage_1/metrics --verbose
 """
 
 import argparse
-import csv
 import sys
 from pathlib import Path
 
-CSV_REL = Path("train") / "metrics_sustainability_episode.csv"
+import numpy as np
+import pandas as pd
+
+CSV_REL = Path("train") / "power_and_co2_metrics.csv"
 
 
 def metrics_root_candidates(override):
     if override:
         return [Path(override)]
     return [
-        Path("/storage_1/metrics_emissions"),   # suggested download dir
-        Path("/storage_1/metrics"),             # huron lab server
-        Path.home() / "scratch" / "metrics",    # on a DRAC login node
-        Path("/home/hartman/scratch/metrics"),
+        Path("/storage_1/metrics"),
+        Path("/storage_1/metrics_emissions"),
+        Path.home() / "scratch" / "metrics",
     ]
 
 
@@ -82,37 +76,50 @@ def range_label(a, b):
     return f"{a}-{b}"
 
 
-def sum_file(path):
-    """Return (kwh_sum, co2_sum, n_rows, n_null_kwh, n_null_co2)."""
-    kwh = co2 = 0.0
-    rows = null_kwh = null_co2 = 0
-    with open(path, newline="") as f:
-        reader = csv.DictReader(f)
-        for row in reader:
-            rows += 1
-            try:
-                kwh += float(row.get("kwh", ""))
-            except (TypeError, ValueError):
-                null_kwh += 1
-            try:
-                co2 += float(row.get("co2", ""))
-            except (TypeError, ValueError):
-                null_co2 += 1
-    return kwh, co2, rows, null_kwh, null_co2
+def energy_and_co2(path):
+    """Return (kWh, co2_kg, n_samples) for one experiment, or None if unusable."""
+    df = pd.read_csv(path)
+    if df.empty or "power" not in df.columns or "time" not in df.columns:
+        return None
+
+    # Time -> seconds-from-start. Prefer datetime parsing (portal writes
+    # timestamps); fall back to numeric epoch (s or ms) if that fails.
+    t = pd.to_datetime(df["time"], errors="coerce")
+    if t.notna().sum() >= 2:
+        secs = (t - t.min()).dt.total_seconds().to_numpy()
+    else:
+        tn = pd.to_numeric(df["time"], errors="coerce").to_numpy()
+        secs = tn - np.nanmin(tn)
+        if np.nanmax(secs) > 1e7:        # looks like milliseconds
+            secs = secs / 1000.0
+
+    power = pd.to_numeric(df["power"], errors="coerce").to_numpy()
+    mask = ~(np.isnan(secs) | np.isnan(power))
+    secs, power = secs[mask], power[mask]
+
+    if len(secs) < 2:
+        kwh = 0.0
+    else:
+        order = np.argsort(secs)
+        secs, power = secs[order], power[order]
+        trapezoid = getattr(np, "trapezoid", None) or np.trapz  # numpy>=2.0 renamed it
+        joules = trapezoid(power, secs)   # W * s = J
+        kwh = joules / 3.6e6
+
+    co2 = pd.to_numeric(df["co2"], errors="coerce").dropna()
+    co2_kg = float(co2.iloc[0]) if len(co2) else float("nan")  # whole-job total
+    return kwh, co2_kg, len(df)
 
 
 def main():
     p = argparse.ArgumentParser(
-        description="Sum total kWh and CO2e across experiment ranges.",
+        description="Sum total kWh and CO2e across experiment ranges (DRAC portal data).",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     p.add_argument("--ranges", nargs="+", default=["7xxx", "9xxx"],
                    help="Experiment ranges (default: 7xxx 9xxx).")
     p.add_argument("--metrics-root", help="Metrics root dir (auto-detected if omitted).")
     p.add_argument("--verbose", action="store_true", help="Print per-experiment rows.")
-    p.add_argument("--intensity", type=float, default=None,
-                   help="gCO2e/kWh used to ESTIMATE CO2e from kWh (e.g. 1.5 for QC hydro). "
-                        "Shown alongside the measured co2 sum.")
     args = p.parse_args()
 
     root = resolve_root(args.metrics_root)
@@ -125,8 +132,7 @@ def main():
 
     ranges = parse_ranges(args.ranges)
 
-    found = []   # (n, path)
-    missing = []
+    found, missing = [], []
     for d in sorted(root.glob("Exp_*")):
         try:
             n = int(d.name.replace("Exp_", ""))
@@ -140,55 +146,52 @@ def main():
         else:
             missing.append(n)
 
-    # Accumulate, tagged by which range each experiment falls in
-    per_range = {range_label(a, b): {"kwh": 0.0, "co2": 0.0, "exps": 0, "rows": 0, "null_co2": 0}
+    per_range = {range_label(a, b): {"kwh": 0.0, "co2": 0.0, "exps": 0, "no_co2": 0}
                  for a, b in ranges}
-    grand = {"kwh": 0.0, "co2": 0.0, "rows": 0, "null_co2": 0, "null_kwh": 0}
+    grand = {"kwh": 0.0, "co2": 0.0, "no_co2": 0}
 
     if args.verbose and found:
-        print(f"\n{'Exp':>6}  {'kWh':>12}  {'CO2e (g)':>12}  {'rows':>6}  null_co2")
-        print("  " + "-" * 52)
+        print(f"\n{'Exp':>6}  {'kWh':>10}  {'CO2e (kg)':>10}  {'samples':>8}")
+        print("  " + "-" * 42)
 
     for n, path in found:
-        kwh, co2, rows, nk, nc = sum_file(path)
+        res = energy_and_co2(path)
+        if res is None:
+            missing.append(n)
+            continue
+        kwh, co2_kg, nsamp = res
         lab = next(range_label(a, b) for a, b in ranges if a <= n <= b)
         per_range[lab]["kwh"] += kwh
-        per_range[lab]["co2"] += co2
         per_range[lab]["exps"] += 1
-        per_range[lab]["rows"] += rows
-        per_range[lab]["null_co2"] += nc
         grand["kwh"] += kwh
-        grand["co2"] += co2
-        grand["rows"] += rows
-        grand["null_co2"] += nc
-        grand["null_kwh"] += nk
+        if np.isnan(co2_kg):
+            per_range[lab]["no_co2"] += 1
+            grand["no_co2"] += 1
+        else:
+            per_range[lab]["co2"] += co2_kg
+            grand["co2"] += co2_kg
         if args.verbose:
-            print(f"{n:>6}  {kwh:>12.4f}  {co2:>12.2f}  {rows:>6}  {nc}")
+            co2_str = "nan" if np.isnan(co2_kg) else f"{co2_kg:.4f}"
+            print(f"{n:>6}  {kwh:>10.4f}  {co2_str:>10}  {nsamp:>8}")
 
-    print("\n" + "=" * 58)
-    print(f"{'Range':>8}  {'experiments':>11}  {'kWh':>12}  {'CO2e (g)':>12}")
-    print("-" * 58)
+    print("\n" + "=" * 52)
+    print(f"{'Range':>8}  {'exps':>5}  {'kWh':>12}  {'CO2e (kg)':>12}")
+    print("-" * 52)
     for lab, v in per_range.items():
-        print(f"{lab:>8}  {v['exps']:>11}  {v['kwh']:>12.4f}  {v['co2']:>12.2f}")
-    print("-" * 58)
-    print(f"{'TOTAL':>8}  {sum(v['exps'] for v in per_range.values()):>11}  "
-          f"{grand['kwh']:>12.4f}  {grand['co2']:>12.2f}")
-    print("=" * 58)
+        print(f"{lab:>8}  {v['exps']:>5}  {v['kwh']:>12.4f}  {v['co2']:>12.4f}")
+    print("-" * 52)
+    print(f"{'TOTAL':>8}  {sum(v['exps'] for v in per_range.values()):>5}  "
+          f"{grand['kwh']:>12.4f}  {grand['co2']:>12.4f}")
+    print("=" * 52)
 
     print(f"\nGRAND TOTAL")
     print(f"  Energy:  {grand['kwh']:.4f} kWh")
-    print(f"  CO2e:    {grand['co2']:.2f} g   ({grand['co2'] / 1000:.4f} kg)   [from stored co2 column]")
-    if args.intensity is not None:
-        est = grand["kwh"] * args.intensity
-        print(f"  CO2e:    {est:.2f} g   ({est / 1000:.4f} kg)   "
-              f"[ESTIMATE = {grand['kwh']:.2f} kWh x {args.intensity} gCO2e/kWh]")
+    print(f"  CO2e:    {grand['co2']:.4f} kg   ({grand['co2'] * 1000:.2f} g)")
 
-    # Health report
-    print(f"\nExperiments found:   {len(found)}")
+    print(f"\nExperiments found: {len(found)}")
     if missing:
-        print(f"Experiments MISSING the csv: {len(missing)}")
-        # compact ranges
-        miss = sorted(missing)
+        miss = sorted(set(missing))
+        print(f"Experiments with no/unusable power csv: {len(miss)}")
         runs, s, prev = [], miss[0], miss[0]
         for x in miss[1:]:
             if x == prev + 1:
@@ -197,11 +200,8 @@ def main():
                 runs.append((s, prev)); s = x; prev = x
         runs.append((s, prev))
         print("  " + ", ".join(f"{a}-{b}" if a != b else str(a) for a, b in runs))
-    if grand["null_co2"]:
-        print(f"NOTE: {grand['null_co2']}/{grand['rows']} rows had blank/None co2 "
-              f"(DRAC nodes often can't resolve grid intensity). Use --intensity to estimate.")
-    if grand["null_kwh"]:
-        print(f"NOTE: {grand['null_kwh']}/{grand['rows']} rows had blank/None kwh.")
+    if grand["no_co2"]:
+        print(f"NOTE: {grand['no_co2']} experiment(s) had power but no co2 value.")
 
     return 0
 
