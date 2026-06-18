@@ -1,0 +1,11 @@
+
+### Experiment 4075: ###
+--------------------------------
+Seed: 1234
+Model: CMA
+Season: spring
+Number of cars: 100
+Number of chargers: 1
+Number of episodes: 1000
+Number of aggregations: 10
+Average rewards when training: False
