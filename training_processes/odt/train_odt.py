@@ -122,15 +122,8 @@ class Experiment:
     
         # fallback to drac path
         if not os.path.exists(dataset_path):
-            offline_experiment_num = self.experiment_number - 108
-            glob_path = os.path.expanduser(
-                f"/home/hartman/scratch/metrics/Exp_{offline_experiment_num}/data_zone_{load_zone}.h5"
-            )
-            matching_files = glob.glob(glob_path)
-            if not matching_files:
-                print(f"[ERROR] No .h5 files found for zone {load_zone} in fallback path: {glob_path}")
-                raise FileNotFoundError(f"No .h5 files found for zone {load_zone}")
-            dataset_path = min(matching_files, key=os.path.getctime)
+            raise FileNotFoundError(f"No .h5 files found for zone {load_zone} in {data_dir}. Exiting...")
+            exit(1)
     
         max_trajs = self.odt_config.get('max_offline_trajectories', None)
 
