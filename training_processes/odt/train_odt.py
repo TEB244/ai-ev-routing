@@ -120,7 +120,6 @@ class Experiment:
             load_zone = load_zone % available
         dataset_path = os.path.join(data_dir, f"data_zone_{load_zone}.h5")
     
-        # fallback to drac path
         if not os.path.exists(dataset_path):
             raise FileNotFoundError(f"No .h5 files found for zone {load_zone} in {data_dir}. Exiting...")
             exit(1)
