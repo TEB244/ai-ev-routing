@@ -31,7 +31,7 @@ from pathlib import Path
 
 # ─── User-Configurable Variables ──────────────────────────────────────────────
 config_general = {
-    "account": "def-mcapretz",
+    "account": "rrg-kgroling",
     "ntasks": 1,
     "stagger_seconds": 30,
     "startup_stagger": 3,
