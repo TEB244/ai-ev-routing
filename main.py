@@ -88,8 +88,7 @@ def main_loop(args):
     run_mode = 'Evaluating' if args.eval else "Training" 
 
     # Fire up initialization by config file
-    # config_fname = f'experiments/Exp_{experiment_number:04d}/config.yaml'
-    config_fname = f'parallel_tests/Exp_{experiment_number:04d}/config.yaml'
+    config_fname = f'experiments/Exp_{experiment_number:04d}/config.yaml'
     c = load_config_file(config_fname)
     env_c = c['environment_settings']
     eval_c = c['eval_config']
