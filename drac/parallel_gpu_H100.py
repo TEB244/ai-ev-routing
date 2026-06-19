@@ -36,15 +36,15 @@ config_general = {
     "stagger_seconds": 30,
     "startup_stagger": 3,
     "omp_num_threads": 2, 
-    "data_dir": f"scratch/metrics/Exp",
-    "parallel_dir": "parallel_tests/",
+    "data_dir": "scratch/metrics/Exp",
+    "parallel_dir": "experiments/",
 
 }
 config_odt = {
     "batch_size": 8,
-    "time": "01:00:00",
+    "time": "01:00:00", # hours
     "cpu_per_experiment": 4,
-    "mem_per_experiment": 10,
+    "mem_per_experiment": 12, # Gigabytes
     "gpus": 1,
 }
 
@@ -69,6 +69,7 @@ def generate_script(config, experiment_bounds) -> str:
     experiment_size = len(experiment_list)
     cpus_per_task = config['cpu_per_experiment']*experiment_size
     mem = config['mem_per_experiment']*experiment_size*(1.2 if experiment_size < 4 else 1)
+    mem_post = "G" if mem < 1024 else "MB"
     time = config['time']
     output_dir = config['parallel_dir'] + f"batch_train_{experiment_list[0]}-{experiment_list[-1]}"
     output_log = output_dir + "/output.log"
@@ -84,7 +85,7 @@ def generate_script(config, experiment_bounds) -> str:
         f"#SBATCH --ntasks={config['ntasks']}",
         f"#SBATCH --cpus-per-task={cpus_per_task}",
         f"#SBATCH --time={time}",
-        f"#SBATCH --mem={int(mem)}G",
+        f"#SBATCH --mem={int(mem)}{mem_post}",
         f"#SBATCH --gpus-per-node={config['gpus']}",
         "",
         "",

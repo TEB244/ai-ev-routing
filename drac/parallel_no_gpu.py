@@ -1,22 +1,22 @@
 #!/usr/bin/env python3
 """
-submit_parallel_experiments.py
+parallel_no_gpu.py
 
-Generates a SLURM batch script for parallel experiment training on DRAC
+Generates a SLURM batch script for parallel experiment training on DRAC (no GPU required)
 and optionally submits it via sbatch.
 
 Usage:
-    python submit_parallel_experiments.py [--dry-run] [--output PATH]
+    python parallel_no_gpu.py [--dry-run] [--output PATH]
 
 Examples:
     # Generate and submit immediately
-    python submit_parallel_experiments.py
+    python parallel_no_gpu.py
 
     # Preview the generated script without submitting
-    python submit_parallel_experiments.py --dry-run
+    python parallel_no_gpu.py --dry-run
 
     # Save script to a custom path and submit
-    python submit_parallel_experiments.py --output my_job.sh
+    python parallel_no_gpu.py --output my_job.sh
 """
 
 import argparse
@@ -35,16 +35,30 @@ config_general = {
     "ntasks": 1,
     "omp_num_threads": 2, 
     "data_dir": f"scratch/metrics/Exp",
-    "parallel_dir": "parallel_tests/",
+    "parallel_dir": "experiments/",
 
 }
 
 config_cma = {
     "batch_size": 8,
-    "time": "00:20:00",
+    "time": "18:30:00",
     "cpu_per_experiment": 5,
-    "mem_per_experiment": 3584
+    "mem_per_experiment": 3584 # Mbytes
 }
+
+# config_dqn = {
+#     "batch_size": 8,
+#     "time": "13:00:00",
+#     "cpu_per_experiment": 6,
+#     "mem_per_experiment": 6 # Gigabytes
+# }
+
+# config_reinforce = {
+#     "batch_size": 8,
+#     "time": "12:00:00",
+#     "cpu_per_experiment": 6,
+#     "mem_per_experiment": 32 # Gigabytes
+# }
 
 # ──────────────────────────────────────────────────────────────────────────────
 
@@ -66,6 +80,7 @@ def generate_script(config, experiment_list) -> str:
     experiment_size = len(experiment_list)
     cpus_per_task = config['cpu_per_experiment']*experiment_size
     mem = config['mem_per_experiment']*experiment_size*(1.2 if experiment_size < 4 else 1)
+    mem_post = "G" if mem < 1024 else "MB"
     time = config['time']
     output_dir = config['parallel_dir'] + f"batch_train_{experiment_list[0]}-{experiment_list[-1]}"
     output_log = output_dir + "/output.log"
@@ -81,7 +96,7 @@ def generate_script(config, experiment_list) -> str:
         f"#SBATCH --ntasks={config['ntasks']}",
         f"#SBATCH --cpus-per-task={cpus_per_task}",
         f"#SBATCH --time={time}",
-        f"#SBATCH --mem={int(mem)}MB",
+        f"#SBATCH --mem={int(mem)}{mem_post}",
         "",
         "",
         "# ─── Configuration ────────────────────────────────────────────────────────────",
@@ -172,10 +187,13 @@ def run_parallel_no_gpu(exp_bounds: list, algorithm: str, args: argparse.Namespa
     
     if algorithm == 'CMA':
         config = {**config_general, **config_cma}
+    # elif algorithm == 'DQN':
+    #     config = {**config_general, **config_dqn}
+    # elif algorithm == 'REINFORCE':
+    #     config = {**config_general, **config_reinforce}
     else:
-        print(f"Algorithm {algorithm} not supported yet. Need to add config information to run this lgorithm. Exiting...")
+        print(f"Algorithm {algorithm} not supported yet. Need to add config information to run this algorithm. Exiting...")
         exit(1)
-    
     exp_list = list(range(exp_bounds[0], exp_bounds[1] + 1))
     batches = [exp_list[i:i + config['batch_size']] for i in range(0, len(exp_list), config['batch_size'])]
     print(f"debug line 181: {batches}")
