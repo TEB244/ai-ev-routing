@@ -547,14 +547,7 @@ def main_loop(args):
                     # for legitimately long aggregations.
                     zone_timeout = max(3600, int(num_episodes) * 25)
                     for process in processes:
-                        process.join(timeout=zone_timeout)
-                    hung = [i for i, p in enumerate(processes) if p.is_alive()]
-                    if hung:
-                        for i in hung:
-                            processes[i].terminate()
-                        raise RuntimeError(
-                            f"Zone(s) {hung} did not finish within {zone_timeout} s — terminated.")
-
+                        process.join()
                     print("Joined Training Processes")
                     
                     gc.collect()

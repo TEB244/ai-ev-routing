@@ -120,17 +120,9 @@ class Experiment:
             load_zone = load_zone % available
         dataset_path = os.path.join(data_dir, f"data_zone_{load_zone}.h5")
     
-        # fallback to drac path
         if not os.path.exists(dataset_path):
-            offline_experiment_num = self.experiment_number - 108
-            glob_path = os.path.expanduser(
-                f"/home/hartman/scratch/metrics/Exp_{offline_experiment_num}/data_zone_{load_zone}.h5"
-            )
-            matching_files = glob.glob(glob_path)
-            if not matching_files:
-                print(f"[ERROR] No .h5 files found for zone {load_zone} in fallback path: {glob_path}")
-                raise FileNotFoundError(f"No .h5 files found for zone {load_zone}")
-            dataset_path = min(matching_files, key=os.path.getctime)
+            raise FileNotFoundError(f"No .h5 files found for zone {load_zone} in {data_dir}. Exiting...")
+            exit(1)
     
         max_trajs = self.odt_config.get('max_offline_trajectories', None)
 
@@ -574,7 +566,15 @@ def train_odt(
     
     
     #Initialize agent
-    experiment.init_agent()
+    # experiment.init_agent()
+    try:
+        experiment.init_agent()
+    except RuntimeError as e:
+        if "CUDA-capable device(s) is/are busy" in str(e):
+            print(f"CUDA-capable device(s) is busy but experiment continues")
+            pass  # silently skip, experiment continues
+        else:
+            raise
     
     #On first aggregation, load dataset and train offline
     if aggregation_num == 0 and experiment.odt_config["max_pretrain_iters"] > 0:
