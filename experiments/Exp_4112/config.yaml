@@ -52,7 +52,7 @@ eval_config:
   generate_plots: false
   save_aggregate_rewards: false
   save_data: true
-  save_offline_data: true
+  save_offline_data: false
   save_path_metrics:
     DRAC: ../../../storage_1/metrics/Exp
     Local: /mnt/storage_1/merl/metrics//Exp
@@ -98,6 +98,7 @@ odt_hyperparameters:
   init_temperature: 0.1
   learning_rate: 0.0001
   log_to_tb: true
+  max_offline_trajectories: 50000
   max_online_iters: 400
   max_pretrain_iters: 1
   n_head: 4
@@ -112,5 +113,5 @@ odt_hyperparameters:
   persist_buffers: true
   replay_size: 500
   save_dir: ./exp
-  warmup_steps: 10000
+  warmup_steps: 200
   weight_decay: 0.0005

@@ -52,7 +52,7 @@ eval_config:
   generate_plots: false
   save_aggregate_rewards: false
   save_data: true
-  save_offline_data: true
+  save_offline_data: false
   save_path_metrics:
     DRAC: ../../../storage_1/metrics/Exp
     Local: /mnt/storage_1/merl/metrics//Exp
@@ -68,15 +68,14 @@ nn_hyperparameters:
   batch_size: 75
   buffer_limit: 150
   city_multiplier: 0.15
-  discount_factor: 0.999
+  discount_factor: 0.99
   eps_per_save: 200
   epsilon: 1
   epsilon_decay: 0.999
   layers:
-  - 128
   - 64
   - 64
-  learning_rate: 1.0e-05
+  learning_rate: 0.001
   log_std_decay_rate: 0.01
   max_num_timesteps: 300
   model_multiplier: 0.5
