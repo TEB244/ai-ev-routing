@@ -539,6 +539,13 @@ def main_loop(args):
 
                     print("Started Training Processes")
 
+                    # Per-aggregation watchdog. The timeout must scale with the
+                    # work in THIS aggregation, or the low-aggregation variants
+                    # (e.g. 1 agg x 10000 eps) get false-killed. ~25 s/episode is
+                    # far above the measured ~3-5 s/episode, so it only trips on a
+                    # genuinely hung zone; the SLURM wall time is the real backstop
+                    # for legitimately long aggregations.
+                    zone_timeout = max(3600, int(num_episodes) * 25)
                     for process in processes:
                         process.join()
                     print("Joined Training Processes")

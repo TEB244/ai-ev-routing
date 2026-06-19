@@ -176,6 +176,14 @@ rsync -av --no-perms --no-times --prune-empty-dirs \
   <drac_username>@narval.alliancecan.ca:~/scratch/metrics/ .
 ```
 
+rsync -av --no-perms --no-times --prune-empty-dirs \
+  --chown=lhartman:share_verde \
+  --chmod=Dg+rwx,Fg+rw,Dg+s \
+  --include='*/' \
+  --include='Exp_*/train/**' \
+  --exclude='*' \
+  hartman@rorqual.alliancecan.ca:~/scratch/metrics/ .
+
 To pull a **single** experiment (e.g. just Exp_7000), narrow the include
 filter:
 ```
