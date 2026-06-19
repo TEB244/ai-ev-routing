@@ -42,7 +42,7 @@ config_general = {
 }
 config_odt = {
     "batch_size": 8,
-    "time": "01:00:00", # hours
+    "time": "00:20:00", # hours
     "cpu_per_experiment": 4,
     "mem_per_experiment": 12, # Gigabytes
     "gpus": 1,
