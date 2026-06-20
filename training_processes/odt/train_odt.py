@@ -8,6 +8,8 @@ import re
 import os
 import glob
 import h5py
+import getpass
+import socket
 
 from decision_makers.agent_odt import DecisionTransformer
 
