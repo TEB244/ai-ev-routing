@@ -63,6 +63,7 @@ class Experiment:
             data_dir = f"/home/{drac_username}/links/scratch"
         else:
             data_dir = f"/home/{drac_username}/scratch"
+        print(f'bug line 66: data dir: {data_dir} and cluster: {cluster_str}')
         scratch_base = os.path.expanduser(os.path.join(data_dir, "saved_networks"))
         if os.path.isdir(os.path.expanduser("~/scratch")):
             self.base_dir = os.path.join(scratch_base, f"Exp_{self.experiment_number}")
