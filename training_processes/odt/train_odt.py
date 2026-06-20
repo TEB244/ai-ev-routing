@@ -58,12 +58,12 @@ class Experiment:
 
         # Retrieve DRAC username and cluster
         drac_username = os.environ.get("DRAC_USERNAME") or getpass.getuser()
-        cluster_str = socket.gethostname()
-        if "rorqual" in cluster_str:
-            data_dir = f"/home/{drac_username}/links/scratch"
-        else:
-            data_dir = f"/home/{drac_username}/scratch"
-        print(f'bug line 66: data dir: {data_dir} and cluster: {cluster_str}')
+        # cluster_str = socket.gethostname()
+        # if "rorqual" in cluster_str:
+        #     data_dir = f"/home/{drac_username}/links/scratch"
+        # else:
+        #     data_dir = f"/home/{drac_username}/scratch"
+        data_dir = f"/home/{drac_username}/links/scratch"
         scratch_base = os.path.expanduser(os.path.join(data_dir, "saved_networks"))
         if os.path.isdir(os.path.expanduser("~/scratch")):
             self.base_dir = os.path.join(scratch_base, f"Exp_{self.experiment_number}")
