@@ -53,7 +53,15 @@ class Experiment:
         self.action_range = [-1, 1]
         self.arwt = self.config['nn_hyperparameters']['average_rewards_when_training']
         self.eps_per_save = int(self.config['nn_hyperparameters'].get('eps_per_save', 1))
-        scratch_base = os.path.expanduser("~/scratch/saved_networks")
+
+        # Retrieve DRAC username and cluster
+        drac_username = os.environ.get("DRAC_USERNAME") or getpass.getuser()
+        cluster_str = socket.gethostname()
+        if "rorqual" in cluster_str:
+            data_dir = f"/home/{drac_username}/links/scratch"
+        else:
+            data_dir = f"/home/{drac_username}/scratch"
+        scratch_base = os.path.expanduser(os.path.join(data_dir, "saved_networks"))
         if os.path.isdir(os.path.expanduser("~/scratch")):
             self.base_dir = os.path.join(scratch_base, f"Exp_{self.experiment_number}")
         else:

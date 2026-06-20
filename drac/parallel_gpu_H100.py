@@ -31,7 +31,7 @@ from pathlib import Path
 
 # ─── User-Configurable Variables ──────────────────────────────────────────────
 config_general = {
-    "account": "rrg-kgroling",
+    "account": "def-mcapretz", #"rrg-kgroling",
     "ntasks": 1,
     "stagger_seconds": 30,
     "startup_stagger": 3,
@@ -44,7 +44,7 @@ config_odt = {
     "batch_size": 8,
     "time": "06:00:00", # hours
     "cpu_per_experiment": 4,
-    "mem_per_experiment": 12, # Gigabytes
+    "mem_per_experiment": 16, # Gigabytes
     "gpus": 1,
 }
 
