@@ -75,7 +75,7 @@ def generate_script(config, experiment_bounds) -> str:
     output_dir = f"{config['parallel_dir']}/train_jobs/job_{batch_name}"
     output_log = f"{output_dir}/output.log"
     error_log = f"{output_dir}/error.log"
-    parallel_dir = f'{config['parallel_dir']}'
+    parallel_dir = f"{config['parallel_dir']}"
 
     lines = [
         "#!/bin/bash",
