@@ -55,7 +55,8 @@ def generate_script(config, experiment_bounds) -> str:
     """Generate the SLURM batch script as a string."""
 
     experiment_list = list(range(experiment_bounds[0], experiment_bounds[1] + 1))
-    job_name = f"Exp_parallel_train_{experiment_list[0]}_{experiment_list[-1]}-GPUH100"
+    batch_name = f'job_{experiment_list[0]}-{experiment_list[-1]}'
+    job_name = f"Exp_parallel_train_{batch_name}-GPUH100"
     exp_array = " ".join(str(e) for e in experiment_list)
 
     # Retrieve DRAC username and cluster
@@ -71,10 +72,10 @@ def generate_script(config, experiment_bounds) -> str:
     mem = config['mem_per_experiment']*experiment_size*(1.2 if experiment_size < 4 else 1)
     mem_post = "G" if mem < 1024 else "MB"
     time = config['time']
-    output_dir = config['parallel_dir'] + f"batch_train_{experiment_list[0]}-{experiment_list[-1]}"
-    output_log = output_dir + "/output.log"
-    error_log = output_dir + "/error.log"
-    parallel_dir = config['parallel_dir']
+    output_dir = f'{config['parallel_dir']}/train_jobs/job_{batch_name}'
+    output_log = f"{output_dir}/output.log"
+    error_log = f"{output_dir}/error.log"
+    parallel_dir = f'{config['parallel_dir']}'
 
     lines = [
         "#!/bin/bash",
@@ -199,7 +200,7 @@ def run_parallel_gpu_H100(exp_list: list, algorithm: str, args: argparse.Namespa
     for experiment_list in batches:
         script_content = generate_script(config, experiment_list)
 
-        script_path = write_script(script_content, f"{config['parallel_dir']}batch_job/job_{experiment_list[0]}-{experiment_list[-1]}.sh")
+        script_path = write_script(script_content, f"{config['parallel_dir']}/train_jobs/sh/job_{experiment_list[0]}-{experiment_list[-1]}.sh")
 
         if hasattr(args, "dry_run") and args.dry_run == True:
             print("─── Generated SLURM script (dry run) ───────────────────────────────────────")
