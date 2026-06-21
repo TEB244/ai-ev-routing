@@ -72,7 +72,7 @@ def generate_script(config, experiment_bounds) -> str:
     mem = config['mem_per_experiment']*experiment_size*(1.2 if experiment_size < 4 else 1)
     mem_post = "G" if mem < 1024 else "MB"
     time = config['time']
-    output_dir = f'{config['parallel_dir']}/train_jobs/job_{batch_name}'
+    output_dir = f"{config['parallel_dir']}/train_jobs/job_{batch_name}"
     output_log = f"{output_dir}/output.log"
     error_log = f"{output_dir}/error.log"
     parallel_dir = f'{config['parallel_dir']}'
