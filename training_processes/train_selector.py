@@ -95,12 +95,6 @@ def train_route(queue, data_dir, ev_info, experiment_number, chargers, environme
 
         print(f"Thread {ind} waiting", flush=True)
 
-        if train_model and num_zones > 1:
-            try:
-                barrier.wait(timeout=7200)  # 2-hour timeout; raises BrokenBarrierError if a zone crashed
-            except Exception as barrier_err:
-                print(f"[Zone {ind}] Barrier failed (another zone likely crashed): {barrier_err}", flush=True)
-                sys.exit(1)
 
     except Exception as e:
         import traceback
