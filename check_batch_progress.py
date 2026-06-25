@@ -13,6 +13,7 @@ Usage:
     python check_batch_progress.py 4000-4179 --metrics-root /storage_1/metrics_postfix
     python check_batch_progress.py 4000-4035 4108-4179 --metrics-root /storage_1/metrics_postfix
     python check_batch_progress.py 4000-4179 --metrics-root ... --verbose
+    python check_batch_progress.py 5108-5179 --metrics-root ...   # ODT ran as parallel batches
 
 Caveats:
   * "needed wall" assumes a partial run consumed ~its full wall (true for a
@@ -20,6 +21,12 @@ Caveats:
     (watchdog "did not finish within N s", or a crash) shows a tiny fraction,
     so its estimate is bogus -- those are flagged with (!) and EXCLUDED from
     the per-DM recommendation. Fix those via the watchdog/crash, not wall time.
+  * PARALLEL BATCHES: ODT (and anything in --parallel-algo) ran several
+    experiments sharing one GPU and one wall clock. For those the script uses
+    the batch wall from drac/parallel_gpu_H100.py (config_odt['time']) instead
+    of each Exp_N/train_job.sh, and the wall recommendation points at that knob.
+    Progress %/episodes come from each Exp_N CSV exactly as for individual runs,
+    so once the parallel data is synced into the metrics root nothing else changes.
 """
 
 import argparse
@@ -90,6 +97,27 @@ def wall_seconds(exp_dir):
     return h * 3600 + mm * 60 + ss
 
 
+def parallel_batch_config():
+    """Map ALGO -> (batch_wall_seconds, batch_size) for algorithms that were
+    submitted as parallel GPU batches. Read from drac/parallel_gpu_H100.py so it
+    stays in sync with how those jobs were actually submitted -- the per-experiment
+    train_job.sh wall is NOT what a shared parallel batch used."""
+    walls = {}
+    pgpu = REPO / "drac" / "parallel_gpu_H100.py"
+    if not pgpu.exists():
+        return walls
+    text = pgpu.read_text()
+    m = re.search(r"config_odt\s*=\s*\{(.*?)\}", text, re.S)
+    if m:
+        body = m.group(1)
+        tm = re.search(r"""['"]time['"]\s*:\s*['"](\d+):(\d\d):(\d\d)['"]""", body)
+        bm = re.search(r"""['"]batch_size['"]\s*:\s*(\d+)""", body)
+        if tm:
+            h, mm, ss = (int(x) for x in tm.groups())
+            walls["ODT"] = (h * 3600 + mm * 60 + ss, int(bm.group(1)) if bm else None)
+    return walls
+
+
 def scan_episodes(csv_path):
     """Return (n_distinct_episodes, max_aggregation_index_seen)."""
     seen = set()
@@ -133,6 +161,10 @@ def main():
     p.add_argument("--exclude-algo", nargs="*", default=[],
                    help="skip experiments for these algorithms, e.g. --exclude-algo CMA "
                         "(CMA runs on another user's scratch and won't be on huron)")
+    p.add_argument("--parallel-algo", nargs="*", default=["ODT"],
+                   help="algorithms submitted as parallel GPU batches (shared wall read "
+                        "from drac/parallel_gpu_H100.py instead of each Exp_N/train_job.sh); "
+                        "default: ODT. Pass with no values to treat every run as individual.")
     args = p.parse_args()
 
     root = resolve_root(args.metrics_root)
@@ -144,7 +176,15 @@ def main():
     # stdout is a clean list of experiment numbers to pipe into sbatch.
     out = sys.stderr if args.incomplete_only else sys.stdout
     exclude = {a.upper() for a in (args.exclude_algo or [])}
+    pbatch = parallel_batch_config()
+    parallel_algos = {a.upper() for a in (args.parallel_algo or [])}
     print(f"Metrics root: {root}\n", file=out)
+    for a in sorted(parallel_algos & set(pbatch)):
+        bw, bsz = pbatch[a]
+        print(f"  [{a}] treated as parallel batch: wall={bw / 3600:.0f}h, batch_size={bsz} "
+              f"(from drac/parallel_gpu_H100.py)", file=out)
+    if parallel_algos & set(pbatch):
+        print("", file=out)
 
     ranges = parse_ranges(args.ranges)
     need = {}          # algo -> max needed seconds
@@ -167,7 +207,11 @@ def main():
                 continue
             season = cfg["environment_settings"].get("season", "?")
             total, aggs, per = expected_episodes(cfg)
-            wall = wall_seconds(REPO / "experiments" / f"Exp_{n}")
+            is_par = algo.upper() in parallel_algos and algo.upper() in pbatch
+            if is_par:
+                wall = pbatch[algo.upper()][0]   # shared parallel-batch wall (parallel_gpu_H100.py)
+            else:
+                wall = wall_seconds(REPO / "experiments" / f"Exp_{n}")
             counts.setdefault(algo, {"done": 0, "partial": 0, "early": 0, "nodata": 0})
 
             csv_p = root / f"Exp_{n}" / "train" / "metrics_agent_episode_level.csv"
@@ -203,8 +247,9 @@ def main():
                 incomplete.append(n)
 
             if args.verbose:
+                par_tag = " [par-batch]" if is_par else ""
                 print(f"{n:>6} {algo:>9} {season:>7} {aggs_str:>9} {eps_str:>15} "
-                      f"{pct:>5.0f}% {fmt_h(wall):>6} {fmt_h(need_s):>7} {status}", file=out)
+                      f"{pct:>5.0f}% {fmt_h(wall):>6} {fmt_h(need_s):>7} {status}{par_tag}", file=out)
 
     print("\n" + "=" * 60, file=out)
     print(f"{'algo':>9}  {'done':>5} {'partial':>8} {'early(!)':>9} {'nodata':>7}", file=out)
@@ -219,8 +264,15 @@ def main():
             print("  (no usable partial runs — every run either finished or exited early.)")
         for algo, secs in sorted(need.items()):
             rec_h = int((secs * args.margin) / 3600) + 1   # round up to whole hours
-            print(f"  {algo:>9}: worst partial needed ~{secs/3600:.1f}h  ->  set ~{rec_h}h  "
-                  f"(x{args.margin} margin)")
+            if algo.upper() in parallel_algos and algo.upper() in pbatch:
+                bsz = pbatch[algo.upper()][1]
+                extra = f", batch_size={bsz}; or run fewer per batch so each finishes faster" if bsz else ""
+                print(f"  {algo:>9}: worst partial needed ~{secs/3600:.1f}h of SHARED batch wall  ->  "
+                      f"set config_odt['time'] in drac/parallel_gpu_H100.py to ~{rec_h}h  "
+                      f"(x{args.margin} margin{extra})")
+            else:
+                print(f"  {algo:>9}: worst partial needed ~{secs/3600:.1f}h  ->  set --time in "
+                      f"train_job.sh to ~{rec_h}h  (x{args.margin} margin)")
         if any(c["early"] for c in counts.values()):
             print("\n(!) EARLY-EXIT runs are NOT wall-time failures (tiny progress) -- likely the")
             print("    per-aggregation watchdog or a crash. Check their error.log; fix the cause,")
