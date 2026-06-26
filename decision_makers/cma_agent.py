@@ -97,6 +97,10 @@ class CMAAgent:
         self.cma_config = cma_config
         self.initial_sigma = initial_sigma
         self.model_type = model_type
+        # The trained solution as loaded from global_weights (the CMA distribution
+        # mean before any evolution). Used for forward-only inference so we can run
+        # the pretrained policy directly without an ask/tell generation.
+        self.loaded_weights = torch.tensor(initial_weights, device=device, dtype=dtype)
         self.states = []
         self.actions = []
         self.gen = 0
@@ -171,6 +175,18 @@ class CMAAgent:
         self.weights_result[self.gen] = weights
         self.gen =+ 1
         return weights
+
+    def get_loaded_weights(self):
+        """
+        Returns the trained weights loaded from global_weights (the CMA mean
+        prior to any evolution). Used for forward-only inference, where we want
+        to run the pretrained policy directly rather than the best-of-population
+        (es.best.x is undefined before the first tell()).
+
+        Returns:
+            torch.Tensor: The loaded trained weights.
+        """
+        return self.loaded_weights
 
     def get_weights(self):
         """

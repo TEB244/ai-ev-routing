@@ -85,8 +85,13 @@ def train_cma(queue,
     nn_c = parameters['nn_hyperparameters']
     environment_c = parameters['environment_settings']
     population_c = parameters['cma_parameters']
+    eval_c = parameters['eval_config']
     eps_per_save = int(nn_c['eps_per_save'])
-    num_episodes = nn_c['num_episodes'] if not args.eval else 100
+
+    # Forward-only inference (10xxx energy batch): run the trained solution once,
+    # skipping the CMA-ES population search and the tell() optimizer step.
+    inference_only = bool(getattr(args, 'eval', False) and eval_c.get('inference_only', False))
+    num_episodes = nn_c['num_episodes'] if (not args.eval or inference_only) else 100
 
     num_cars = environment_c['num_of_cars']
     num_agents = 1 if agent_by_zone else num_cars  # Determine number of agents based on assignment mode
@@ -141,6 +146,32 @@ def train_cma(queue,
     environment.reset_episode(chargers, routes, unique_chargers)
     environment.init_sim(aggregation_num)
     
+    # --- Forward-only inference (10xxx energy batch) --------------------------
+    # Run the trained (loaded) CMA solution for a single rollout, write per-episode
+    # metrics, then return. Skips CMA-ES population search, the tell() optimizer
+    # step, and the .pkl model save (which would overwrite the pretrained source).
+    if inference_only:
+        environment.reset_episode(chargers, routes, unique_chargers)
+        sim_done = False
+        timestep_rewards = None
+        while not sim_done:
+            environment.init_routing()
+            for car_idx in range(num_cars):
+                state = environment.reset_agent(car_idx)
+                agent_idx = 0 if agent_by_zone else car_idx
+                agent = cma_agents_list[agent_idx]
+                weights = agent.get_loaded_weights()
+                car_route = agent.model(state, weights)
+                environment.generate_paths(torch.tensor(car_route, device=device), None, agent_idx)
+            sim_done, timestep_rewards, _ = environment.simulate_routes()
+        station_data, agent_data = environment.get_data()
+        queue.put({'tag': 'csv', 'station_data': station_data, 'agent_data': agent_data})
+        reward_val = float(np.mean(timestep_rewards)) if timestep_rewards is not None else 0.0
+        avg_rewards.append((reward_val, aggregation_num, zone_index, main_seed))
+        torch.cuda.empty_cache()
+        return [], avg_rewards, [], None
+    # -------------------------------------------------------------------------
+
     # Save the current state of the environment for later restoration during evolution
     environment.population_mode_store()
     
