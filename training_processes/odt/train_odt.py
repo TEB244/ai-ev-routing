@@ -105,28 +105,43 @@ class Experiment:
             inference_only = bool(getattr(self.args, 'eval', False)
                                   and eval_cfg.get('inference_only', False))
             if inference_only:
-                # Forward-only inference (10xxx energy batch). Load a *pretrained*
-                # model that may live under a different (source) experiment number.
-                # NOTE: _load_weights() appends '/model.pt', so path_prefix must be
-                # the containing DIRECTORY (the legacy code below passed a file path,
-                # which double-appended and silently loaded nothing).
+                # Forward-only inference (10xxx energy batch). Load the *converged*
+                # pretrained model for THIS zone from a (possibly different) source
+                # experiment. Training saves a checkpoint per aggregation/zone as
+                # 'Agg:<n>-Zone:<z>/model.pt' (z is 0-indexed); we load the HIGHEST
+                # aggregation = the fully-trained model. _load_weights() appends
+                # '/model.pt', so we pass the containing directory.
+                #
+                # (The legacy branch below loaded Agg:0 with a 1-indexed Zone+1 and
+                # passed a file path as the prefix -- all three were wrong, so eval
+                # silently loaded nothing.)
                 src_exp = eval_cfg.get('weights_from_exp') or self.experiment_number
-                num_zones = self.odt_config.get(
-                    'num_zones', len(self.config['environment_settings']['coords']))
-                next_zone = (self.zone_index + 1) % num_zones
-                candidate_dirs = [
-                    f"saved_networks/Exp_{src_exp}/Agg:0-Zone:{next_zone + 1}",
-                    os.path.join(os.path.expanduser("~/links/scratch/saved_networks"),
-                                 f"Exp_{src_exp}", f"Agg:0-Zone:{next_zone + 1}"),
-                    f"../exp/Exp_{src_exp}/Agg:0-Zone:{next_zone + 1}",
+                zone = self.zone_index  # 0-indexed, matches the Agg:n-Zone:z dir names
+                search_bases = [
+                    f"saved_networks/Exp_{src_exp}",
+                    os.path.expanduser(f"~/links/scratch/saved_networks/Exp_{src_exp}"),
+                    os.path.expanduser(f"~/scratch/saved_networks/Exp_{src_exp}"),
                 ]
-                model_dir = next(
-                    (d for d in candidate_dirs if os.path.exists(f"{d}/model.pt")), None)
-                if model_dir is None:
+                hits = []
+                for base in search_bases:
+                    hits = glob.glob(
+                        os.path.join(base, "**", f"Agg:*-Zone:{zone}", "model.pt"),
+                        recursive=True)
+                    if hits:
+                        break
+                if not hits:
                     raise FileNotFoundError(
-                        f"ODT inference: no model.pt for source Exp_{src_exp}, "
-                        f"zone {next_zone + 1}. Looked in: {candidate_dirs}")
-                print(f"[ODT inference] loading pretrained weights from {model_dir}/model.pt")
+                        f"ODT inference: no 'Agg:*-Zone:{zone}/model.pt' for source "
+                        f"Exp_{src_exp}. Searched (recursively): {search_bases}")
+
+                def _agg_num(path):
+                    m = re.search(r"Agg:(\d+)-Zone:", path)
+                    return int(m.group(1)) if m else -1
+
+                model_file = max(hits, key=_agg_num)
+                model_dir = os.path.dirname(model_file)
+                print(f"[ODT inference] zone {zone}: loading {model_file} "
+                      f"(agg {_agg_num(model_file)}) from source Exp_{src_exp}")
                 self.ODTAgent._load_weights(path_prefix=model_dir, load_optimizer=False)
             else:
                 num_zones = self.odt_config.get('num_zones', 4)
