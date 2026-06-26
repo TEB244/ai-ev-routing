@@ -63,11 +63,14 @@ EXP_DIR = REPO_ROOT / "experiments"
 # Defaults are the per-DM baselines used as sensitivity templates (4xxx); ODT's
 # baseline (4108) has no saved global model locally, so we default it to 9999.
 # ----------------------------------------------------------------------------
+# Best 4xxx base model per DM, selected by find_best_base_models.py on huron
+# (metrics_postfix) -- highest mean reward over the last 100 episodes, all
+# fully trained (10000 eps; ODT 8000). Re-run that script to refresh.
 SOURCE_EXP = {
-    "DQN":       4000,
-    "REINFORCE": 4036,
-    "CMA":       4072,
-    "ODT":       9999,
+    "DQN":       4028,   # reward -76.52, seed 5555
+    "REINFORCE": 4064,   # reward -85.27, seed 5555
+    "CMA":       4103,   # reward -94.38, seed 5555
+    "ODT":       4140,   # reward -75.99, seed 2020
 }
 
 # Sweep definition
@@ -76,11 +79,13 @@ CAR_COUNTS = [10, 50, 100, 200]
 SEEDS = [1234, 5555, 2020]
 START_EXP = 10000
 
-# Scratch paths per model (mirrors generate_sensitivity_experiments.py)
+# Scratch path for the eval-metrics output (-d). All inference jobs are run by
+# hartman, so everything writes to hartman's scratch (the sensitivity script
+# pointed CMA at sgomezro because sgomezro ran CMA training -- not the case here).
 SCRATCH_PATH = {
     "DQN":       "/home/hartman/scratch/metrics/Exp",
     "REINFORCE": "/home/hartman/scratch/metrics/Exp",
-    "CMA":       "/home/sgomezro/scratch/metrics/Exp",
+    "CMA":       "/home/hartman/scratch/metrics/Exp",
     "ODT":       "/home/hartman/links/scratch/metrics/Exp",
 }
 

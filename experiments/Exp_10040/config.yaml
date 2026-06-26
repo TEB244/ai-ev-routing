@@ -17,10 +17,6 @@ environment_settings:
     - -81.30953935839466
   - - 42.9819404397449
     - -81.2508736429095
-  distance_scale: 100.0
-  distance_weight: 0.0
-  energy_scale: 0.001
-  energy_weight: 1.0
   ev_rationality: 0.9
   increase_rate: 12500
   max_charge:
@@ -37,14 +33,12 @@ environment_settings:
   num_of_chargers: 1
   radius: 20
   saving_data_deepness: episode_level
-  season: spring
+  season: summer
   seed: 5555
   start_sequence: random
   starting_charge: 6000
   step_size: 0.01
   traffic_noise: 3
-  traffic_scale: 1.0
-  traffic_weight: 1.0
   usage_per_hour:
   - 9840
   - 8460
@@ -61,21 +55,22 @@ eval_config:
   save_data: true
   save_offline_data: false
   save_path_metrics:
-    DRAC: /home/hartman/scratch/metrics/Exp
-    Local: ./_test_metrics/Exp
+    DRAC: ../../../storage_1/metrics/Exp
+    Local: /mnt/storage_1/merl/metrics//Exp
   verbose: true
-  weights_from_exp: 9999
+  weights_from_exp: 4140
 federated_learning_settings:
   aggregation_count: 1
+  aggregation_count_eval: 6
   city_multiplier: 0.15
   model_multiplier: 0.5
   zone_multiplier: 0.35
 nn_hyperparameters:
   average_rewards_when_training: false
   batch_size: 75
-  buffer_limit: 1500
+  buffer_limit: 150
   city_multiplier: 0.15
-  discount_factor: 0.99
+  discount_factor: 0.999
   eps_per_save: 1
   epsilon: 1
   epsilon_decay: 0.999
@@ -83,7 +78,7 @@ nn_hyperparameters:
   - 128
   - 64
   - 64
-  learning_rate: 0.001
+  learning_rate: 1.0e-05
   log_std_decay_rate: 0.01
   max_num_timesteps: 300
   model_multiplier: 0.5
@@ -99,10 +94,13 @@ odt_hyperparameters:
   eval_context_length: 5
   eval_interval: 1
   eval_rtg: -50
+  evaluation: false
   exp_name: 10040
+  experiment_number: 10040
   init_temperature: 0.1
   learning_rate: 0.0001
-  max_offline_trajectories: 10
+  log_to_tb: true
+  max_offline_trajectories: 50000
   max_online_iters: 1
   max_pretrain_iters: 0
   n_head: 4
@@ -114,6 +112,8 @@ odt_hyperparameters:
   offline_dataset_path: /scratch/hartman/metrics/Exp_3001/
   online_rtg: -50
   ordering: 0
+  persist_buffers: true
   replay_size: 500
-  warmup_steps: 10000
+  save_dir: ./exp
+  warmup_steps: 200
   weight_decay: 0.0005

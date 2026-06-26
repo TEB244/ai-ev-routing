@@ -20,4 +20,4 @@ source ~/envs/merl_env/bin/activate
 
 export OMP_NUM_THREADS=2
 
-python main.py -e 10024 -d "/home/sgomezro/scratch/metrics/Exp" -eval True
+python main.py -e 10024 -d "/home/hartman/scratch/metrics/Exp" -eval True

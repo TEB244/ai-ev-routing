@@ -3,7 +3,7 @@
 --------------------------------
 Model: REINFORCE
 Mode: inference-only eval (forward passes, no gradient step)
-Pretrained weights from: Exp_4036
+Pretrained weights from: Exp_4064
 Seed: 1234
 Number of cars (per zone): 200
 Number of zones: 4
