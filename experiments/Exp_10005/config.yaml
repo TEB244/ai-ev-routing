@@ -8,7 +8,6 @@ cma_parameters:
   population_dimension: 20
 environment_settings:
   action_dim: 5
-  carbon_save_interval: 2
   coords:
   - - 43.02120034946083
     - -81.28349087468504
@@ -34,7 +33,7 @@ environment_settings:
   num_of_chargers: 1
   radius: 20
   saving_data_deepness: episode_level
-  season: spring
+  season: summer
   seed: 2020
   start_sequence: random
   starting_charge: 6000
@@ -57,9 +56,9 @@ eval_config:
   save_offline_data: false
   save_path_metrics:
     DRAC: ../../../storage_1/metrics/Exp
-    Local: /storage_1/merl/metrics//Exp
+    Local: /mnt/storage_1/merl/metrics//Exp
   verbose: true
-  weights_from_exp: 4000
+  weights_from_exp: 4028
 federated_learning_settings:
   aggregation_count: 1
   city_multiplier: 0.15
@@ -86,31 +85,43 @@ nn_hyperparameters:
   num_epochs: 10
   zone_multiplier: 0.35
 odt_hyperparameters:
-  K: 20
+  K: 10
   activation_function: relu
-  batch_size: 128
+  approximate_entropy_samples: 1000
+  batch_size: 256
+  dataset: '[10seeds]-100-3-3-100-North-East'
+  device: cuda:1
   dropout: 0.1
-  embed_dim: 512
-  eval_context_length: 5
+  embed_dim: 128
+  env: hopper
+  eval_context: 5
   eval_interval: 1
-  eval_rtg: -60
+  eval_only: false
   exp_name: 10005
-  experiment_number: 10005
-  init_temperature: 0.1
   learning_rate: 0.0001
-  log_to_tb: true
+  log_to_wandb: true
+  max_iters: 2
   max_online_iters: 1
   max_pretrain_iters: 0
-  n_head: 4
-  n_layer: 4
+  mode: normal
+  model_type: dt
+  n_head: 1
+  n_layer: 3
   num_eval_episodes: 1
   num_online_rollouts: 1
+  num_steps_per_iter: 300
   num_updates_per_online_iter: 0
-  num_updates_per_pretrain_iter: 500
-  online_rtg: -60
-  ordering: 0
-  persist_buffers: true
-  replay_size: 500
-  save_dir: ./exp
+  online_buffer_size: 1001
+  online_training: true
+  pct_traj: 1.0
+  pretrained_model: /storage_1/epigou_storage/offline_networks/dt_0[10seeds]-100-3-3-100-North-East-620076.pt
+  remove_pos_embs: false
+  save_model: false
+  stochastic: true
+  stochastic_tanh: true
+  target_entropy: true
+  use_action_means: true
+  use_entropy: false
   warmup_steps: 10000
-  weight_decay: 0.0005
+  weight_decay: 0.0001
+  zone_index: 1

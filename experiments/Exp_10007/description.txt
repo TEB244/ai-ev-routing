@@ -3,7 +3,7 @@
 --------------------------------
 Model: DQN
 Mode: inference-only eval (forward passes, no gradient step)
-Pretrained weights from: Exp_4000
+Pretrained weights from: Exp_4028
 Seed: 5555
 Number of cars (per zone): 100
 Number of zones: 4

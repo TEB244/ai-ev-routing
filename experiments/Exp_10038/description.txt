@@ -3,7 +3,7 @@
 --------------------------------
 Model: ODT
 Mode: inference-only eval (forward passes, no gradient step)
-Pretrained weights from: Exp_9999
+Pretrained weights from: Exp_4140
 Seed: 2020
 Number of cars (per zone): 10
 Number of zones: 4
