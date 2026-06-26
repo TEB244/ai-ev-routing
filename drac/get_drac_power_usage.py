@@ -41,7 +41,7 @@ def _get_json(url):
     return json.loads(urllib.request.urlopen(urllib.request.Request(url, headers=HEADERS)).read())
 
 
-def save_job_power_usage(job, experiment_num, username, base_path, host):
+def save_job_power_usage(job, experiment_num, username, base_path, host, mode="train"):
     """Save the power usage + CO2 of one job to a per-experiment CSV."""
     power_url = f"https://{host}/secure/jobstats/{username}/{job['id_job']}/graph/power.json"
     print(f"Making request to {power_url}")
@@ -51,7 +51,7 @@ def save_job_power_usage(job, experiment_num, username, base_path, host):
     print(f"Making request to {co2_url}")
     co2_data = _get_json(co2_url)
 
-    save_path = f"{base_path}/Exp_{experiment_num}/train/power_and_co2_metrics.csv"
+    save_path = f"{base_path}/Exp_{experiment_num}/{mode}/power_and_co2_metrics.csv"
     if not os.path.exists(save_path):
         os.makedirs(os.path.dirname(save_path), exist_ok=True)
 
@@ -66,7 +66,7 @@ def save_job_power_usage(job, experiment_num, username, base_path, host):
         for x, y in zip(power_data['data'][0]['x'], power_data['data'][0]['y']):
             f.write(f'{x},{y},{co2_data["co2_emissions_kg"]}\n')
 
-def get_jobs_per_experiments(experiment_list, username, base_path, host, length):
+def get_jobs_per_experiments(experiment_list, username, base_path, host, length, mode="train"):
     """Pull power+CO2 for every experiment in [start, end]."""
     url = f"https://{host}/api/jobs/?format=datatables&username={username}&length={length}"
     print(f"Making request to {url}")
@@ -76,9 +76,9 @@ def get_jobs_per_experiments(experiment_list, username, base_path, host, length)
     for experiment in range(experiment_list[0], experiment_list[1] + 1):
         # Most recent matching job that actually has power data wins.
         for job in data['data']:
-            if job['job_name'] == f"Exp_{experiment}_train":
+            if job['job_name'] == f"Exp_{experiment}_{mode}":
                 try:
-                    save_job_power_usage(job, experiment, username, base_path, host)
+                    save_job_power_usage(job, experiment, username, base_path, host, mode)
                     print(f"Saved data for job {job['id_job']}")
                     saved += 1
                     break
@@ -100,6 +100,9 @@ if __name__ == "__main__":
     parser.add_argument('--host', type=str, default='portail.beluga.calculquebec.ca',
                         help='portal host for the cluster the jobs ran on')
     parser.add_argument('--length', type=int, default=2000, help='max jobs to fetch from the portal')
+    parser.add_argument('--mode', type=str, default='train', choices=['train', 'eval'],
+                        help="job-name suffix / output subdir: 'train' (default) or "
+                             "'eval' (e.g. the 10xxx inference batch).")
     args = parser.parse_args()
 
     if not os.environ.get('COOKIE'):
@@ -108,4 +111,4 @@ if __name__ == "__main__":
     if len(args.e) != 2:
         raise SystemExit("Pass a start and end experiment number, e.g. -e 7000 7179")
 
-    get_jobs_per_experiments(args.e, args.u, args.p, args.host, args.length)
+    get_jobs_per_experiments(args.e, args.u, args.p, args.host, args.length, args.mode)

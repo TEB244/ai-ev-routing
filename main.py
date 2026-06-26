@@ -102,6 +102,15 @@ def main_loop(args):
     # Whether to continue the training
     load_existing_model = eval_c['continue_training']
 
+    # Inference-only eval (10xxx energy-regression batch). When set, eval runs
+    # pure forward passes (no gradient step) and may load a pretrained model
+    # from a *different* experiment via eval_config.weights_from_exp. Gated on
+    # the flag so all existing train/eval runs are unaffected.
+    inference_only = bool(args.eval and eval_c.get('inference_only', False))
+    eval_train_model = not inference_only
+    # Experiment whose saved model we load weights from (defaults to self).
+    weights_exp = eval_c.get('weights_from_exp') or experiment_number
+
 
     # Directory where models are saved (the global weights)
     save_global_path = f'saved_networks/Exp_{experiment_number}/'
@@ -162,7 +171,7 @@ def main_loop(args):
 
     # Retrieve Training or Evaluation mode and Continue or from scrath model training
     if (run_mode == "Evaluating") or (load_existing_model):
-        global_weights = torch.load(f'saved_networks/Exp_{experiment_number}/global_weights.pth')
+        global_weights = torch.load(f'saved_networks/Exp_{weights_exp}/global_weights.pth')
 
     # Start writer proccess
     metrics_path = f"{metrics_base_path}/{'eval' if args.eval else 'train'}"
@@ -457,11 +466,11 @@ def main_loop(args):
         print_l(f"Loading saved models - Seed {seed}")
         
         try:
-            global_weights = torch.load(f'saved_networks/Exp_{experiment_number}/global_weights.pth')
+            global_weights = torch.load(f'saved_networks/Exp_{weights_exp}/global_weights.pth')
             assert global_weights is not None, "Global weights are None"
         except Exception as e:
-            print_l(f"No saved model found for experiment {experiment_number}")
-            raise Exception(f"No saved model found for experiment {experiment_number}")
+            print_l(f"No saved model found for experiment {weights_exp}")
+            raise Exception(f"No saved model found for experiment {weights_exp}")
 
         rewards = []  # Array of [(avg_reward, aggregation_num, route_index, seed)]
         output_values = []  # Array of [(episode_avg_output_values, episode_number, aggregation_num, route_index, seed)]
@@ -508,7 +517,7 @@ def main_loop(args):
                                 local_weights_list, process_rewards,\
                                 process_output_values, None, devices[0], verbose,\
                                 eval_c['display_training_times'], agent_by_zone, variant,\
-                                eval_c['save_offline_data'], True, old_buffers[0],\
+                                eval_c['save_offline_data'], eval_train_model, old_buffers[0],\
                                 process_buffers, weights_to_save, len(chargers))
                 else:
                     manager = mp.Manager()
@@ -530,7 +539,7 @@ def main_loop(args):
                                   local_weights_list, process_rewards,\
                                   process_output_values, barrier, devices[ind], verbose,\
                                   eval_c['display_training_times'], agent_by_zone, variant,\
-                                  eval_c['save_offline_data'], True, old_buffers[ind], \
+                                  eval_c['save_offline_data'], eval_train_model, old_buffers[ind], \
                                   process_buffers, weights_to_save, len(chargers))
 
                         process = mp.Process(target=train_route, args=args_tuple)

@@ -1,0 +1,16 @@
+
+### Experiment 10028: ###  (inference-energy batch)
+--------------------------------
+Model: CMA
+Mode: inference-only eval (forward passes, no gradient step)
+Pretrained weights from: Exp_4072
+Seed: 5555
+Number of cars (per zone): 50
+Number of zones: 4
+Total cars: 200
+Number of episodes: 1
+Number of aggregations: 1
+
+Part of the per-car inference-energy regression:
+    energy(n_cars) = a + b * n_cars
+    a = fixed model-load + spin-up cost, b = energy per car.

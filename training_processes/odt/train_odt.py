@@ -101,12 +101,40 @@ class Experiment:
 
         #Loads previously trained model weights from different zone if evaluation
         if self.evaluation and self.aggregation_num == 0:
-            num_zones = self.odt_config.get('num_zones', 4)
-            next_zone = (self.zone_index + 1) % num_zones
-            model_dir = f"../exp/Exp_{self.experiment_number}/Agg:0-Zone:{next_zone+1}"
-            model_file = model_dir + "/model.pt"
-            
-            self.ODTAgent._load_weights(path_prefix=model_file, load_optimizer=True)
+            eval_cfg = self.config.get('eval_config', {})
+            inference_only = bool(getattr(self.args, 'eval', False)
+                                  and eval_cfg.get('inference_only', False))
+            if inference_only:
+                # Forward-only inference (10xxx energy batch). Load a *pretrained*
+                # model that may live under a different (source) experiment number.
+                # NOTE: _load_weights() appends '/model.pt', so path_prefix must be
+                # the containing DIRECTORY (the legacy code below passed a file path,
+                # which double-appended and silently loaded nothing).
+                src_exp = eval_cfg.get('weights_from_exp') or self.experiment_number
+                num_zones = self.odt_config.get(
+                    'num_zones', len(self.config['environment_settings']['coords']))
+                next_zone = (self.zone_index + 1) % num_zones
+                candidate_dirs = [
+                    f"saved_networks/Exp_{src_exp}/Agg:0-Zone:{next_zone + 1}",
+                    os.path.join(os.path.expanduser("~/links/scratch/saved_networks"),
+                                 f"Exp_{src_exp}", f"Agg:0-Zone:{next_zone + 1}"),
+                    f"../exp/Exp_{src_exp}/Agg:0-Zone:{next_zone + 1}",
+                ]
+                model_dir = next(
+                    (d for d in candidate_dirs if os.path.exists(f"{d}/model.pt")), None)
+                if model_dir is None:
+                    raise FileNotFoundError(
+                        f"ODT inference: no model.pt for source Exp_{src_exp}, "
+                        f"zone {next_zone + 1}. Looked in: {candidate_dirs}")
+                print(f"[ODT inference] loading pretrained weights from {model_dir}/model.pt")
+                self.ODTAgent._load_weights(path_prefix=model_dir, load_optimizer=False)
+            else:
+                num_zones = self.odt_config.get('num_zones', 4)
+                next_zone = (self.zone_index + 1) % num_zones
+                model_dir = f"../exp/Exp_{self.experiment_number}/Agg:0-Zone:{next_zone+1}"
+                model_file = model_dir + "/model.pt"
+
+                self.ODTAgent._load_weights(path_prefix=model_file, load_optimizer=True)
             
         # Load previous aggregation weights if on new aggregation
         if self.aggregation_num > 0:

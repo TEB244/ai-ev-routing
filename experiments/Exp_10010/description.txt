@@ -1,0 +1,16 @@
+
+### Experiment 10010: ###  (inference-energy batch)
+--------------------------------
+Model: DQN
+Mode: inference-only eval (forward passes, no gradient step)
+Pretrained weights from: Exp_4000
+Seed: 5555
+Number of cars (per zone): 200
+Number of zones: 4
+Total cars: 800
+Number of episodes: 1
+Number of aggregations: 1
+
+Part of the per-car inference-energy regression:
+    energy(n_cars) = a + b * n_cars
+    a = fixed model-load + spin-up cost, b = energy per car.
