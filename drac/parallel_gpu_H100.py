@@ -38,11 +38,11 @@ config_general = {
     "omp_num_threads": 2, 
     "data_dir": "scratch/metrics/Exp",
     "parallel_dir": "experiments/",
-
+    "email": "lhartma8@uwo.ca",
 }
 config_odt = {
     "batch_size": 8,
-    "time": "06:00:00", # hours
+    "time": "09:00:00", # hours (8-way MPS sharing; 6h was timing out)
     "cpu_per_experiment": 4,
     "mem_per_experiment": 16, # Gigabytes
     "gpus": 1,
@@ -88,6 +88,8 @@ def generate_script(config, experiment_bounds) -> str:
         f"#SBATCH --time={time}",
         f"#SBATCH --mem={int(mem)}{mem_post}",
         f"#SBATCH --gpus-per-node={config['gpus']}",
+        "#SBATCH --mail-type=FAIL,TIME_LIMIT",
+        f"#SBATCH --mail-user={config['email']}",
         "",
         "",
         "# ─── Configuration ────────────────────────────────────────────────────────────",
@@ -106,14 +108,35 @@ def generate_script(config, experiment_bounds) -> str:
         "# Enable multi-threading (shared across all processes)",
         f"export OMP_NUM_THREADS={config['omp_num_threads']}",
         "",
-        "# Activate Nvidia MPS — allows multiple CUDA processes to share one GPU",
-        "export CUDA_MPS_PIPE_DIRECTORY=/tmp/nvidia-mps",
-        "export CUDA_MPS_LOG_DIRECTORY=/tmp/nvidia-log",
+        "# Activate Nvidia MPS — allows multiple CUDA processes to share one GPU.",
+        "# PER-JOB pipe/log dirs: /tmp is node-local and SHARED, so two batches landing",
+        "# on the same node would collide on /tmp/nvidia-mps and the late one dies with",
+        "# 'CUDA error 805: MPS client failed to connect to the MPS control daemon'.",
+        "export CUDA_MPS_PIPE_DIRECTORY=/tmp/nvidia-mps-$SLURM_JOB_ID",
+        "export CUDA_MPS_LOG_DIRECTORY=/tmp/nvidia-log-$SLURM_JOB_ID",
+        "mkdir -p \"$CUDA_MPS_PIPE_DIRECTORY\" \"$CUDA_MPS_LOG_DIRECTORY\"",
+        "",
+        "# Stop MPS + drop our pipe dir on exit so no stale state is left for the next job.",
+        "cleanup_mps() { echo quit | nvidia-cuda-mps-control 2>/dev/null || true; rm -rf \"$CUDA_MPS_PIPE_DIRECTORY\" \"$CUDA_MPS_LOG_DIRECTORY\"; }",
+        "trap cleanup_mps EXIT",
+        "",
         "nvidia-cuda-mps-control -d",
         "sleep 10                            # Give MPS daemon time to start",
         "",
-        "# Pre-warm the CUDA context",
-        "python -c \"import torch; torch.zeros(1).cuda(); print('CUDA context ready')\"",
+        "# Pre-warm / verify the CUDA context. Retry so a transient MPS hiccup does not",
+        "# silently launch 8 GPU-less experiments; fail the whole batch if it never comes up.",
+        "cuda_ok=0",
+        "for attempt in 1 2 3; do",
+        "    if python -c \"import torch; torch.zeros(1).cuda(); print('CUDA context ready')\"; then",
+        "        cuda_ok=1; break",
+        "    fi",
+        "    echo \"CUDA/MPS not ready (attempt $attempt/3), retrying in 10s...\"",
+        "    sleep 10",
+        "done",
+        "if [ \"$cuda_ok\" -ne 1 ]; then",
+        "    echo \"ERROR: GPU/MPS unavailable after 3 attempts -- failing batch.\" >&2",
+        "    exit 1",
+        "fi",
         "sleep 2",
         "",
         "# Create output dirs for all experiments upfront",
@@ -148,8 +171,8 @@ def generate_script(config, experiment_bounds) -> str:
         "    fi",
         "done",
         "",
-        "# Shut down MPS daemon cleanly",
-        "echo quit | nvidia-cuda-mps-control",
+        "# (MPS daemon stopped + per-job pipe dir removed by the cleanup_mps EXIT",
+        "#  trap from setup, so cleanup runs even when the summary below exits 1.)",
         "",
         "# Report summary",
         "if [ ${#FAILED[@]} -eq 0 ]; then",
@@ -167,7 +190,7 @@ def generate_script(config, experiment_bounds) -> str:
 def write_script(script_content: str, output_path: str) -> Path:
     path = Path(output_path)
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(script_content)
+    path.write_text(script_content, encoding="utf-8")
     path.chmod(0o755)
     print(f"[✓] Script written to: {path.resolve()}")
     return path
