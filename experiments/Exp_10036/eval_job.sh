@@ -2,7 +2,7 @@
 #SBATCH --job-name=Exp_10036_eval
 #SBATCH --output=experiments/Exp_10036/output.log
 #SBATCH --error=experiments/Exp_10036/error.log
-#SBATCH -A  rrg-kgroling
+#SBATCH -A def-mcapretz
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=6
 #SBATCH --time=01:00:00

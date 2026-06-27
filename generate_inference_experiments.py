@@ -193,7 +193,7 @@ def _odt_eval_job(exp_num: int, model: str) -> str:
 #SBATCH --job-name=Exp_{exp_num}_eval
 #SBATCH --output=experiments/Exp_{exp_num}/output.log
 #SBATCH --error=experiments/Exp_{exp_num}/error.log
-#SBATCH -A  rrg-kgroling
+#SBATCH -A def-mcapretz
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=6
 #SBATCH --time=01:00:00
