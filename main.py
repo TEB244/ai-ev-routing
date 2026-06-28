@@ -611,14 +611,21 @@ def main_loop(args):
                 })
 
 
-                # Aggregate the attention layers from all local agents
-                if algorithm_dm == 'ODT':
+                # Aggregate the attention layers from all local agents.
+                # Inference-only eval runs with train_model=False, so train_route
+                # never fills local_weights_list (it stays all-None) and there is
+                # no model to update or save. Aggregating None crashed
+                # get_global_weights and left the job hanging until the SLURM wall
+                # limit -- contaminating the energy measurement with idle time.
+                if inference_only:
+                    pass
+                elif algorithm_dm == 'ODT':
                     global_weights = get_global_weights(local_weights_list, ev_info,\
                                                         federated_c['city_multiplier'],\
                                                         federated_c['zone_multiplier'],\
                                                         federated_c['model_multiplier'],\
                                                         agent_by_zone)
-                elif algorithm_dm == 'DENSER': 
+                elif algorithm_dm == 'DENSER':
                     # Cannot aggregate weights for DENSER because architecture is different between agents
                     pass
                 else:
