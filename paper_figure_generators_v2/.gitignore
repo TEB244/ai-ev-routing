@@ -1,0 +1,4 @@
+# Built on Huron by build_v2_cache.py from /storage_1/metrics_postfix; not committed.
+table_data/_v2_cache/
+__pycache__/
+*.pyc
