@@ -8,9 +8,9 @@ Seed: 5555
 Number of cars (per zone): 200
 Number of zones: 4
 Total cars: 800
-Number of episodes: 1
+Number of episodes (inference loops): 40
 Number of aggregations: 1
 
 Part of the per-car inference-energy regression:
-    energy(n_cars) = a + b * n_cars
-    a = fixed model-load + spin-up cost, b = energy per car.
+    energy(n_cars) = a + b * n_cars,  with b = NUM_EPISODES * per_car
+    a = fixed model-load + spin-up cost; per_car = b / NUM_EPISODES.

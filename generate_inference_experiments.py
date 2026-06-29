@@ -75,9 +75,26 @@ SOURCE_EXP = {
 
 # Sweep definition
 MODEL_ORDER = ["DQN", "REINFORCE", "CMA", "ODT"]
-CAR_COUNTS = [10, 50, 100, 200]
+# Narrowed to a 4x range (was 10-200 = 20x). The DRAC portal can't resolve
+# sub-minute jobs, so we loop the inference NUM_EPISODES times to push each job
+# into the tens-of-minutes range where the portal samples reliably. A fixed loop
+# count means runtime scales with cars, so a 20x car range would make the largest
+# jobs run ~all day; 4x keeps the smallest job ~30-45 min and the largest ~3 h.
+CAR_COUNTS = [50, 100, 150, 200]
 SEEDS = [1234, 5555, 2020]
 START_EXP = 10000
+
+# Inference loop count. energy(cars) = load + NUM_EPISODES * per_car * cars, so
+# the regression slope is NUM_EPISODES * per_car; fit_inference_regression.py
+# divides by this to recover per-car energy. Sized from measured N=1 runtimes
+# (~32 s load + ~1.3 s/car/episode for DQN) so even the 50-car job clears the
+# portal's sampling floor. Bump it if the smallest jobs still under-sample.
+NUM_EPISODES = 40
+
+# Per-car-count SLURM wall time (DQN is the slowest DM, so these cover all three
+# with margin; ODT/CMA finish sooner). Scaling the wall with car count keeps the
+# small jobs schedulable instead of all requesting the max.
+WALL_BY_CARS = {50: "02:00:00", 100: "03:00:00", 150: "04:00:00", 200: "05:00:00"}
 
 # Scratch path for the eval-metrics output (-d). All inference jobs run on Narval
 # as hartman, so everything writes to the same scratch. (The sensitivity script
@@ -107,25 +124,28 @@ def apply_inference_overrides(cfg: dict, model: str, car_count: int, seed: int,
 
     cfg.setdefault("algorithm_settings", {})["algorithm"] = model
 
-    # Exactly one aggregation, one episode.
+    # One aggregation; loop the inference NUM_EPISODES times (forward-only) so the
+    # job runs long enough for the portal to sample it. DQN/REINFORCE/ODT loop on
+    # num_episodes natively; CMA's inference path loops it too (see cma.py).
     cfg.setdefault("federated_learning_settings", {})["aggregation_count"] = 1
     nn = cfg.setdefault("nn_hyperparameters", {})
-    nn["num_episodes"] = 1
-    nn["eps_per_save"] = 1
+    nn["num_episodes"] = NUM_EPISODES
+    nn["eps_per_save"] = NUM_EPISODES
 
-    # CMA: one generation (the inference path skips the population search anyway).
+    # CMA: the inference path loops num_episodes rollouts of the trained solution
+    # (no population search / tell). max_generations is unused on that path.
     if "cma_parameters" in cfg:
         cfg["cma_parameters"]["max_generations"] = 1
 
-    # ODT: no offline pretrain, one online iter, zero gradient updates.
+    # ODT: no offline pretrain, NUM_EPISODES online rollouts, zero gradient updates.
     if "odt_hyperparameters" in cfg:
         odt = cfg["odt_hyperparameters"]
         odt["max_pretrain_iters"] = 0
-        odt["max_online_iters"] = 1
+        odt["max_online_iters"] = NUM_EPISODES
         odt["num_updates_per_online_iter"] = 0
         odt["num_online_rollouts"] = 1
         odt["num_eval_episodes"] = 1
-        odt["eval_interval"] = 1
+        odt["eval_interval"] = NUM_EPISODES + 1   # never trigger the eval/update branch
         odt["exp_name"] = exp_num
         if "experiment_number" in odt:
             odt["experiment_number"] = exp_num
@@ -153,16 +173,16 @@ Seed: {seed}
 Number of cars (per zone): {car_count}
 Number of zones: {n_zones}
 Total cars: {car_count * n_zones}
-Number of episodes: 1
+Number of episodes (inference loops): {NUM_EPISODES}
 Number of aggregations: 1
 
 Part of the per-car inference-energy regression:
-    energy(n_cars) = a + b * n_cars
-    a = fixed model-load + spin-up cost, b = energy per car.
+    energy(n_cars) = a + b * n_cars,  with b = NUM_EPISODES * per_car
+    a = fixed model-load + spin-up cost; per_car = b / NUM_EPISODES.
 """
 
 
-def _cpu_eval_job(exp_num: int, model: str) -> str:
+def _cpu_eval_job(exp_num: int, model: str, wall: str) -> str:
     return f"""#!/bin/bash
 #SBATCH --job-name=Exp_{exp_num}_eval
 #SBATCH --output=experiments/Exp_{exp_num}/output.log
@@ -170,7 +190,7 @@ def _cpu_eval_job(exp_num: int, model: str) -> str:
 #SBATCH -A def-mcapretz
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=6
-#SBATCH --time=01:00:00
+#SBATCH --time={wall}
 #SBATCH --mem=6G
 
 #SBATCH --mail-type=FAIL,TIME_LIMIT
@@ -189,7 +209,35 @@ python main.py -e {exp_num} -d "{SCRATCH_PATH[model]}" -eval True
 """
 
 
-def _odt_eval_job(exp_num: int, model: str) -> str:
+def _cma_eval_job(exp_num: int, model: str, wall: str) -> str:
+    # CMA spec per sgomezro: 5 CPUs, ~3584 MB RAM.
+    return f"""#!/bin/bash
+#SBATCH --job-name=Exp_{exp_num}_eval
+#SBATCH --output=experiments/Exp_{exp_num}/output.log
+#SBATCH --error=experiments/Exp_{exp_num}/error.log
+#SBATCH -A def-mcapretz
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=5
+#SBATCH --time={wall}
+#SBATCH --mem=3584M
+
+#SBATCH --mail-type=FAIL,TIME_LIMIT
+#SBATCH --mail-user=lhartma8@uwo.ca
+
+echo "Starting inference (eval) for experiment {exp_num}"
+
+set -e
+
+module load python/3.10 cuda cudnn
+source ~/envs/merl_env/bin/activate
+
+export OMP_NUM_THREADS=2
+
+python main.py -e {exp_num} -d "{SCRATCH_PATH[model]}" -eval True
+"""
+
+
+def _odt_eval_job(exp_num: int, model: str, wall: str) -> str:
     return f"""#!/bin/bash
 #SBATCH --job-name=Exp_{exp_num}_eval
 #SBATCH --output=experiments/Exp_{exp_num}/output.log
@@ -197,7 +245,7 @@ def _odt_eval_job(exp_num: int, model: str) -> str:
 #SBATCH -A def-mcapretz
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=6
-#SBATCH --time=01:00:00
+#SBATCH --time={wall}
 #SBATCH --mem=32G
 #SBATCH --gpus-per-node=1
 
@@ -222,8 +270,13 @@ python main.py -g 0 -e {exp_num} -d "{SCRATCH_PATH[model]}" -eval True
 """
 
 
-def make_eval_job(exp_num: int, model: str) -> str:
-    return _odt_eval_job(exp_num, model) if model == "ODT" else _cpu_eval_job(exp_num, model)
+def make_eval_job(exp_num: int, model: str, car_count: int) -> str:
+    wall = WALL_BY_CARS[car_count]
+    if model == "ODT":
+        return _odt_eval_job(exp_num, model, wall)
+    if model == "CMA":
+        return _cma_eval_job(exp_num, model, wall)
+    return _cpu_eval_job(exp_num, model, wall)
 
 
 def main():
@@ -263,7 +316,7 @@ def main():
                 with open(out_dir / "description.txt", "w") as f:
                     f.write(make_description(exp_num, model, source_exp, car_count, seed, n_zones))
                 with open(out_dir / "eval_job.sh", "w", newline="\n") as f:
-                    f.write(make_eval_job(exp_num, model))
+                    f.write(make_eval_job(exp_num, model, car_count))
 
                 manifest.append((exp_num, model, source_exp, car_count, seed))
                 exp_num += 1

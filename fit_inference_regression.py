@@ -98,8 +98,9 @@ def main():
             missing.append(n)
             continue
         kwh, co2_kg, _ = res
-        per_dm.setdefault(dm, []).append((cars * n_zones, cars, kwh, co2_kg))
-        rows.append((n, dm, cars, n_zones, cars * n_zones, kwh, co2_kg))
+        num_eps = int(cfg.get("nn_hyperparameters", {}).get("num_episodes", 1) or 1)
+        per_dm.setdefault(dm, []).append((cars * n_zones, cars, kwh, co2_kg, num_eps))
+        rows.append((n, dm, cars, n_zones, cars * n_zones, kwh, co2_kg, num_eps))
 
     if not rows:
         print("No usable eval power CSVs found. Run the jobs, then scrape with:\n"
@@ -107,39 +108,44 @@ def main():
               "-p <metrics-root> --mode eval --host <portal-host>", file=sys.stderr)
         return 1
 
-    # Per-DM regression.
-    print(f"{'DM':<10} {'n':>3}  {'load kWh (a)':>13}  {'kWh/car (b)':>13}  "
+    # Per-DM regression. The inference is looped N_ep times per job, so
+    # energy = load + (N_ep * per_car) * cars and the fitted slope is N_ep*per_car;
+    # divide by N_ep to report energy per car for ONE inference episode. The
+    # intercept (load) is one-time per job and is NOT divided.
+    print(f"{'DM':<10} {'n':>3} {'N_ep':>5}  {'load kWh':>10}  {'kWh/car':>12}  "
           f"{'kWh/total-car':>14}  {'R^2':>6}")
-    print("-" * 70)
+    print("-" * 74)
     summary = []
     for dm in sorted(per_dm):
         pts = per_dm[dm]
-        cars_cfg = [c for _, c, _, _ in pts]
-        cars_tot = [t for t, _, _, _ in pts]
-        kwh = [k for _, _, k, _ in pts]
+        cars_cfg = [c for _, c, _, _, _ in pts]
+        cars_tot = [t for t, _, _, _, _ in pts]
+        kwh = [k for _, _, k, _, _ in pts]
+        co2 = [c for _, _, _, c, _ in pts]
+        N = max(p[4] for p in pts)   # inference loop count (constant within a batch)
         a, b_cfg, r2 = ols_fit(cars_cfg, kwh)
         _, b_tot, _ = ols_fit(cars_tot, kwh)
-        print(f"{dm:<10} {len(pts):>3}  {a:>13.6f}  {b_cfg:>13.6f}  {b_tot:>14.6f}  {r2:>6.3f}")
-        # Same for CO2e.
-        co2 = [c for _, _, _, c in pts]
+        print(f"{dm:<10} {len(pts):>3} {N:>5}  {a:>10.6f}  {b_cfg / N:>12.6f}  "
+              f"{b_tot / N:>14.6f}  {r2:>6.3f}")
         a_c, b_c_cfg, r2_c = ols_fit(cars_cfg, co2)
         _, b_c_tot, _ = ols_fit(cars_tot, co2)
         summary.append({
-            "dm": dm, "n_points": len(pts),
-            "load_kwh": a, "kwh_per_car_cfg": b_cfg, "kwh_per_total_car": b_tot, "r2_kwh": r2,
-            "load_co2_kg": a_c, "co2kg_per_car_cfg": b_c_cfg,
-            "co2kg_per_total_car": b_c_tot, "r2_co2": r2_c,
+            "dm": dm, "n_points": len(pts), "num_episodes": N,
+            "load_kwh": a, "kwh_per_car": b_cfg / N, "kwh_per_total_car": b_tot / N, "r2_kwh": r2,
+            "load_co2_kg": a_c, "co2kg_per_car": b_c_cfg / N,
+            "co2kg_per_total_car": b_c_tot / N, "r2_co2": r2_c,
         })
-    print("-" * 70)
-    print("a = load/spin-up energy (intercept); b = marginal energy per car.")
+    print("-" * 74)
+    print("load = fixed model-load + spin-up energy (intercept, one-time per job).")
+    print("kWh/car = per-car energy for ONE inference episode (fitted slope / N_ep).")
     print("'/car' uses the per-zone config value; '/total-car' divides by zones.\n")
 
-    print("CO2e regression (kg):")
-    print(f"{'DM':<10}  {'load kg (a)':>13}  {'kg/car (b)':>13}  {'R^2':>6}")
+    print("CO2e regression (kg, per-car already divided by N_ep):")
+    print(f"{'DM':<10}  {'load kg':>13}  {'kg/car':>13}  {'R^2':>6}")
     print("-" * 50)
     for s in summary:
         print(f"{s['dm']:<10}  {s['load_co2_kg']:>13.6f}  "
-              f"{s['co2kg_per_car_cfg']:>13.6f}  {s['r2_co2']:>6.3f}")
+              f"{s['co2kg_per_car']:>13.6f}  {s['r2_co2']:>6.3f}")
 
     if missing:
         print(f"\nNote: {len(missing)} experiment(s) had no usable eval power CSV "
@@ -149,7 +155,7 @@ def main():
         import csv
         with open(args.csv_out, "w", newline="") as f:
             w = csv.writer(f)
-            w.writerow(["exp", "dm", "cars_per_zone", "n_zones", "total_cars", "kwh", "co2_kg"])
+            w.writerow(["exp", "dm", "cars_per_zone", "n_zones", "total_cars", "kwh", "co2_kg", "num_episodes"])
             w.writerows(sorted(rows))
         print(f"\nPer-experiment rows written to {args.csv_out}")
 
