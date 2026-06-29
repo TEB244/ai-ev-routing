@@ -8,7 +8,7 @@ Seed: 1234
 Number of cars (per zone): 100
 Number of zones: 4
 Total cars: 400
-Number of episodes (inference loops): 40
+Number of episodes (inference loops): 20
 Number of aggregations: 1
 
 Part of the per-car inference-energy regression:

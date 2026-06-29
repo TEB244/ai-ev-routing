@@ -8,7 +8,7 @@ Seed: 2020
 Number of cars (per zone): 200
 Number of zones: 4
 Total cars: 800
-Number of episodes (inference loops): 40
+Number of episodes (inference loops): 20
 Number of aggregations: 1
 
 Part of the per-car inference-energy regression:

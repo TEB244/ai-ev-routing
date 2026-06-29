@@ -71,7 +71,7 @@ nn_hyperparameters:
   buffer_limit: 150
   city_multiplier: 0.15
   discount_factor: 0.999
-  eps_per_save: 40
+  eps_per_save: 20
   epsilon: 1
   epsilon_decay: 0.999
   layers:
@@ -82,7 +82,7 @@ nn_hyperparameters:
   log_std_decay_rate: 0.01
   max_num_timesteps: 300
   model_multiplier: 0.5
-  num_episodes: 40
+  num_episodes: 20
   num_epochs: 10
   zone_multiplier: 0.35
 odt_hyperparameters:
@@ -92,7 +92,7 @@ odt_hyperparameters:
   dropout: 0.1
   embed_dim: 512
   eval_context_length: 5
-  eval_interval: 41
+  eval_interval: 21
   eval_rtg: -50
   evaluation: false
   exp_name: 10038
@@ -101,7 +101,7 @@ odt_hyperparameters:
   learning_rate: 0.0001
   log_to_tb: true
   max_offline_trajectories: 50000
-  max_online_iters: 40
+  max_online_iters: 20
   max_pretrain_iters: 0
   n_head: 4
   n_layer: 4
