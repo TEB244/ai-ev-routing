@@ -1,0 +1,37 @@
+{
+  "DQN": {
+    "nn_hyperparameters": {
+      "learning_rate": 0.01,
+      "discount_factor": 0.99,
+      "buffer_limit": 500,
+      "target_network_update_frequency": 25,
+      "target_episode_epsilon_frac": 0.3
+    }
+  },
+  "REINFORCE": {
+    "nn_hyperparameters": {
+      "learning_rate": 0.001,
+      "discount_factor": 0.99,
+      "layers": [
+        64,
+        64
+      ]
+    }
+  },
+  "CMA": {
+    "cma_parameters": {
+      "initial_sigma": 0.1,
+      "population_dimension": 20,
+      "max_generations": 200
+    }
+  },
+  "ODT": {
+    "odt_hyperparameters": {
+      "learning_rate": 0.0001,
+      "embed_dim": 512,
+      "n_layer": 4,
+      "K": 10,
+      "online_rtg": -50
+    }
+  }
+}
