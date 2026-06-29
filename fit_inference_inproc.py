@@ -34,8 +34,6 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from fit_inference_regression import ols_fit  # noqa: E402
 
-CPU_DMS = {"DQN", "REINFORCE", "CMA"}
-
 
 def metrics_root_candidates(override):
     if override:
@@ -62,7 +60,12 @@ def main():
     p.add_argument("--range", nargs=2, type=int, default=[10000, 10047])
     p.add_argument("--metrics-root")
     p.add_argument("--csv-out")
+    p.add_argument("--gpu-dms", nargs="*", default=[],
+                   help="DMs that were run on GPU (-g 0): use total_kwh (cpu+gpu) for "
+                        "them; everyone else uses cpu_kwh. Default: all cpu_kwh, since "
+                        "the runs were CPU and the idle-GPU baseline isn't a DM's cost.")
     args = p.parse_args()
+    gpu_dms = set(args.gpu_dms)
 
     root = resolve_root(args.metrics_root)
     if root is None or not root.is_dir():
@@ -87,7 +90,7 @@ def main():
         cpu_kwh = float(r["cpu_kwh"])
         gpu_kwh = float(r["gpu_kwh"])
         total_kwh = float(r["total_kwh"])
-        energy = cpu_kwh if dm in CPU_DMS else total_kwh
+        energy = total_kwh if dm in gpu_dms else cpu_kwh
         per_dm.setdefault(dm, []).append((cars, energy, cpu_kwh, gpu_kwh, float(r["seconds"])))
         rows_out.append((n, dm, cars, r["seconds"], r["gpu_measured"], cpu_kwh, gpu_kwh, total_kwh))
 
@@ -103,7 +106,7 @@ def main():
         cars = [c for c, _, _, _, _ in pts]
         energy = [e for _, e, _, _, _ in pts]
         a, b, r2 = ols_fit(cars, energy)
-        used = "cpu_kwh" if dm in CPU_DMS else "total_kwh"
+        used = "total_kwh" if dm in gpu_dms else "cpu_kwh"
         print(f"{dm:<10} {len(pts):>3}  {used:>11}  {a:>11.6f}  {b:>12.6f}  {r2:>6.3f}")
     print("-" * 64)
     print("load = fixed env+base setup (intercept); kWh/car = per-car cost (slope).")
