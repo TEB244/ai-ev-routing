@@ -79,14 +79,15 @@ CAR_COUNTS = [10, 50, 100, 200]
 SEEDS = [1234, 5555, 2020]
 START_EXP = 10000
 
-# Scratch path for the eval-metrics output (-d). All inference jobs are run by
-# hartman, so everything writes to hartman's scratch (the sensitivity script
-# pointed CMA at sgomezro because sgomezro ran CMA training -- not the case here).
+# Scratch path for the eval-metrics output (-d). All inference jobs run on Narval
+# as hartman, so everything writes to the same scratch. (The sensitivity script
+# split these by training owner/cluster -- CMA->sgomezro, ODT->links/scratch on
+# Rorqual -- but that's irrelevant for these Narval inference runs.)
 SCRATCH_PATH = {
     "DQN":       "/home/hartman/scratch/metrics/Exp",
     "REINFORCE": "/home/hartman/scratch/metrics/Exp",
     "CMA":       "/home/hartman/scratch/metrics/Exp",
-    "ODT":       "/home/hartman/links/scratch/metrics/Exp",
+    "ODT":       "/home/hartman/scratch/metrics/Exp",
 }
 
 
