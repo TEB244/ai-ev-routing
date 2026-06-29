@@ -72,23 +72,31 @@ def get_jobs_per_experiments(experiment_list, username, base_path, host, length,
     print(f"Making request to {url}")
     data = _get_json(url)
 
-    saved, skipped = 0, []
+    saved, skipped, not_ready = 0, [], []
     for experiment in range(experiment_list[0], experiment_list[1] + 1):
-        # Most recent matching job that actually has power data wins.
-        for job in data['data']:
-            if job['job_name'] == f"Exp_{experiment}_{mode}":
-                try:
-                    save_job_power_usage(job, experiment, username, base_path, host, mode)
-                    print(f"Saved data for job {job['id_job']}")
-                    saved += 1
-                    break
-                except Exception as e:
-                    print(e)
-        else:
+        # Take the NEWEST matching job (highest job id). Do NOT fall back to an
+        # older run if the newest lacks power data -- that silently yields stale
+        # data from a previous (e.g. timed-out) submission. Report it as not-ready
+        # so a rerun's power can be re-scraped once the portal ingests it.
+        matching = [j for j in data['data'] if j['job_name'] == f"Exp_{experiment}_{mode}"]
+        if not matching:
             skipped.append(experiment)
-    print(f"\n[{host}] saved {saved}, no job/power found for {len(skipped)} experiments")
+            continue
+        job = max(matching, key=lambda j: int(j['id_job']))
+        try:
+            save_job_power_usage(job, experiment, username, base_path, host, mode)
+            print(f"Saved data for job {job['id_job']}")
+            saved += 1
+        except Exception as e:
+            print(f"  Exp_{experiment}: newest job {job['id_job']} has no power data yet "
+                  f"({e}); not falling back to older runs")
+            not_ready.append(experiment)
+    print(f"\n[{host}] saved {saved}; {len(not_ready)} newest-job-not-ready; "
+          f"{len(skipped)} no matching job")
+    if not_ready:
+        print(f"  power not on portal yet (wait ~30-60 min, re-scrape): {not_ready}")
     if skipped:
-        print(f"  not found here (may live on another cluster): {skipped[:20]}"
+        print(f"  no matching job (may live on another cluster): {skipped[:20]}"
               + (" ..." if len(skipped) > 20 else ""))
 
 
