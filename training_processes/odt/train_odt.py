@@ -642,7 +642,11 @@ def train_odt(
         state_std = np.ones(experiment.environment.state_dim, dtype=np.float32)
         with open(experiment.stats_path, 'wb') as f:
             pickle.dump({'state_mean': state_mean, 'state_std': state_std}, f)
-        if getattr(args, 'server', 'DRAC') == 'DRAC':
+        # Use the no-op tracker on DRAC (carbontracker disabled there) AND for
+        # inference runs -- the EnergyMeter in main.py measures inference energy
+        # externally, so ODT's own carbontracker would only add overhead/conflict.
+        if (getattr(args, 'server', 'DRAC') == 'DRAC'
+                or config.get('eval_config', {}).get('inference_only', False)):
             experiment.tracker = NullCarbonTracker()
         else:
             from carbontracker.tracker import CarbonTracker
