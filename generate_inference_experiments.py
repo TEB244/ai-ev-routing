@@ -49,6 +49,7 @@ Usage:
 
 import argparse
 import copy
+import math
 from pathlib import Path
 
 import yaml
@@ -86,15 +87,26 @@ START_EXP = 10000
 
 # Inference loop count. energy(cars) = load + NUM_EPISODES * per_car * cars, so
 # the regression slope is NUM_EPISODES * per_car; fit_inference_regression.py
-# divides by this to recover per-car energy. Sized from measured N=1 runtimes
-# (~32 s load + ~1.3 s/car/episode for DQN) so even the 50-car job clears the
-# portal's sampling floor. Bump it if the smallest jobs still under-sample.
-NUM_EPISODES = 40
+# divides by this to recover per-car energy. The 1-episode runs (sub-minute to
+# ~5 min) were too short for the portal (logged <2 power samples -> 0 kWh); 20
+# loops puts even the 50-car job at ~17-25 min, comfortably above that floor.
+# The canary (one 50-car job) validates this; lower it further if it over-samples.
+NUM_EPISODES = 20
 
-# Per-car-count SLURM wall time (DQN is the slowest DM, so these cover all three
-# with margin; ODT/CMA finish sooner). Scaling the wall with car count keeps the
-# small jobs schedulable instead of all requesting the max.
-WALL_BY_CARS = {50: "02:00:00", 100: "03:00:00", 150: "04:00:00", 200: "05:00:00"}
+# SLURM wall = ~1.3x the expected runtime, computed per (DM, car count) from the
+# measured N=1 timings below, rounded up to 15 min (30 min floor). Tight walls
+# (vs. fixed padding) keep DRAC backfill/priority healthy. Per-episode time is
+# ~K seconds/car (from the N=1 runtimes); plus ~35 s fixed load.
+LOAD_S = 35.0
+K_S_PER_CAR = {"DQN": 1.34, "REINFORCE": 1.22, "CMA": 1.34, "ODT": 0.98}  # CMA ~= DQN (untimed)
+
+
+def wall_time(model: str, car_count: int) -> str:
+    secs = (LOAD_S + NUM_EPISODES * K_S_PER_CAR.get(model, 1.34) * car_count) * 1.3
+    quantum = 15 * 60
+    secs = max(30 * 60, math.ceil(secs / quantum) * quantum)
+    h, m = divmod(int(secs // 60), 60)
+    return f"{h}:{m:02d}:00"
 
 # Scratch path for the eval-metrics output (-d). All inference jobs run on Narval
 # as hartman, so everything writes to the same scratch. (The sensitivity script
@@ -271,7 +283,7 @@ python main.py -g 0 -e {exp_num} -d "{SCRATCH_PATH[model]}" -eval True
 
 
 def make_eval_job(exp_num: int, model: str, car_count: int) -> str:
-    wall = WALL_BY_CARS[car_count]
+    wall = wall_time(model, car_count)
     if model == "ODT":
         return _odt_eval_job(exp_num, model, wall)
     if model == "CMA":
