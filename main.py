@@ -30,6 +30,27 @@ import torch.multiprocessing as mp
 mp.set_sharing_strategy('file_system')
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'TRUE'
 
+
+def write_inference_energy(base_path, exp_num, dm, num_cars, n_zones, n_episodes, meter):
+    """Append one in-process energy row for an inference run (huron / -server Local).
+
+    cpu_kwh is process-level (psutil x TDP, marginal); gpu_kwh is whole-GPU via NVML
+    (includes idle baseline). The fit uses cpu_kwh for CPU DMs and total for ODT.
+    """
+    import csv
+    path = f"{base_path}/eval/inference_energy.csv"
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    new = not os.path.exists(path)
+    with open(path, "a", newline="") as f:
+        w = csv.writer(f)
+        if new:
+            w.writerow(["exp", "dm", "num_cars", "n_zones", "num_episodes", "seconds",
+                        "n_samples", "gpu_measured", "cpu_kwh", "gpu_kwh", "total_kwh", "co2_g"])
+        w.writerow([exp_num, dm, num_cars, n_zones, n_episodes, f"{meter.seconds:.3f}",
+                    meter.n_samples, meter.gpu_measured, f"{meter.cpu_kwh:.10f}",
+                    f"{meter.gpu_kwh:.10f}", f"{meter.total_kwh:.10f}", f"{meter.co2_g:.8f}"])
+
+
 def main_loop(args):
 
     """
@@ -509,16 +530,35 @@ def main_loop(args):
                     process_buffers = [None]
                     weights_to_save = [None]
 
+                    # In-process energy metering for inference on a workstation
+                    # (e.g. huron, -server Local): the DRAC portal can't resolve these
+                    # short jobs. Single-zone keeps this one process so CPU/GPU
+                    # attribution is clean. No-op on DRAC (nullcontext).
+                    if inference_only and args.server != 'DRAC':
+                        from environment._energy_meter import EnergyMeter
+                        meter_cm = EnergyMeter(
+                            cpu_tdp_w=float(eval_c.get('cpu_tdp_w', 280.0)),
+                            carbon_intensity_g_per_kwh=float(eval_c.get('carbon_intensity', 170.0)))
+                    else:
+                        from contextlib import nullcontext
+                        meter_cm = nullcontext()
+
                     # Run directly without multiprocessing
-                    train_route(queue, data_dir, ev_info, experiment_number, chargers[0],\
-                                copy.deepcopy(environment_list[0]), all_routes[0], date,\
-                                action_dim, global_weights, aggregate_step, 0, algorithm_dm,\
-                                chargers_seeds[0], seed, args, eval_c['fixed_attributes'],\
-                                local_weights_list, process_rewards,\
-                                process_output_values, None, devices[0], verbose,\
-                                eval_c['display_training_times'], agent_by_zone, variant,\
-                                eval_c['save_offline_data'], eval_train_model, old_buffers[0],\
-                                process_buffers, weights_to_save, len(chargers))
+                    with meter_cm as meter:
+                        train_route(queue, data_dir, ev_info, experiment_number, chargers[0],\
+                                    copy.deepcopy(environment_list[0]), all_routes[0], date,\
+                                    action_dim, global_weights, aggregate_step, 0, algorithm_dm,\
+                                    chargers_seeds[0], seed, args, eval_c['fixed_attributes'],\
+                                    local_weights_list, process_rewards,\
+                                    process_output_values, None, devices[0], verbose,\
+                                    eval_c['display_training_times'], agent_by_zone, variant,\
+                                    eval_c['save_offline_data'], eval_train_model, old_buffers[0],\
+                                    process_buffers, weights_to_save, len(chargers))
+
+                    if meter is not None:
+                        write_inference_energy(metrics_base_path, experiment_number, algorithm_dm,
+                                               env_c['num_of_cars'], len(env_c['coords']),
+                                               c['nn_hyperparameters']['num_episodes'], meter)
                 else:
                     manager = mp.Manager()
                     local_weights_list = manager.list([None for _ in range(len(chargers))])
