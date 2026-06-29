@@ -70,7 +70,7 @@ nn_hyperparameters:
   buffer_limit: 150
   city_multiplier: 0.15
   discount_factor: 0.99
-  eps_per_save: 1
+  eps_per_save: 40
   epsilon: 1
   epsilon_decay: 0.999
   layers:
@@ -80,7 +80,7 @@ nn_hyperparameters:
   log_std_decay_rate: 0.01
   max_num_timesteps: 300
   model_multiplier: 0.5
-  num_episodes: 1
+  num_episodes: 40
   num_epochs: 10
   zone_multiplier: 0.35
 odt_hyperparameters:
@@ -94,13 +94,13 @@ odt_hyperparameters:
   embed_dim: 128
   env: hopper
   eval_context: 5
-  eval_interval: 1
+  eval_interval: 41
   eval_only: false
   exp_name: 10023
   learning_rate: 0.0001
   log_to_wandb: true
   max_iters: 2
-  max_online_iters: 1
+  max_online_iters: 40
   max_pretrain_iters: 0
   mode: normal
   model_type: dt

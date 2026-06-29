@@ -147,27 +147,29 @@ def train_cma(queue,
     environment.init_sim(aggregation_num)
     
     # --- Forward-only inference (10xxx energy batch) --------------------------
-    # Run the trained (loaded) CMA solution for a single rollout, write per-episode
-    # metrics, then return. Skips CMA-ES population search, the tell() optimizer
+    # Run the trained (loaded) CMA solution for num_episodes rollouts (looped so
+    # the job runs long enough for the DRAC portal to sample its power), writing
+    # per-episode metrics. Skips CMA-ES population search, the tell() optimizer
     # step, and the .pkl model save (which would overwrite the pretrained source).
     if inference_only:
-        environment.reset_episode(chargers, routes, unique_chargers)
-        sim_done = False
-        timestep_rewards = None
-        while not sim_done:
-            environment.init_routing()
-            for car_idx in range(num_cars):
-                state = environment.reset_agent(car_idx)
-                agent_idx = 0 if agent_by_zone else car_idx
-                agent = cma_agents_list[agent_idx]
-                weights = agent.get_loaded_weights()
-                car_route = agent.model(state, weights)
-                environment.generate_paths(torch.tensor(car_route, device=device), None, agent_idx)
-            sim_done, timestep_rewards, _ = environment.simulate_routes()
-        station_data, agent_data = environment.get_data()
-        queue.put({'tag': 'csv', 'station_data': station_data, 'agent_data': agent_data})
-        reward_val = float(np.mean(timestep_rewards)) if timestep_rewards is not None else 0.0
-        avg_rewards.append((reward_val, aggregation_num, zone_index, main_seed))
+        for _ in range(num_episodes):
+            environment.reset_episode(chargers, routes, unique_chargers)
+            sim_done = False
+            timestep_rewards = None
+            while not sim_done:
+                environment.init_routing()
+                for car_idx in range(num_cars):
+                    state = environment.reset_agent(car_idx)
+                    agent_idx = 0 if agent_by_zone else car_idx
+                    agent = cma_agents_list[agent_idx]
+                    weights = agent.get_loaded_weights()
+                    car_route = agent.model(state, weights)
+                    environment.generate_paths(torch.tensor(car_route, device=device), None, agent_idx)
+                sim_done, timestep_rewards, _ = environment.simulate_routes()
+            station_data, agent_data = environment.get_data()
+            queue.put({'tag': 'csv', 'station_data': station_data, 'agent_data': agent_data})
+            reward_val = float(np.mean(timestep_rewards)) if timestep_rewards is not None else 0.0
+            avg_rewards.append((reward_val, aggregation_num, zone_index, main_seed))
         torch.cuda.empty_cache()
         return [], avg_rewards, [], None
     # -------------------------------------------------------------------------
