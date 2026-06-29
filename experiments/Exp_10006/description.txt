@@ -6,8 +6,8 @@ Mode: inference-only eval (forward passes, no gradient step)
 Pretrained weights from: Exp_4028
 Seed: 1234
 Number of cars (per zone): 150
-Number of zones: 4
-Total cars: 600
+Number of zones: 1
+Total cars: 150
 Number of episodes (inference loops): 20
 Number of aggregations: 1
 

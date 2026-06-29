@@ -127,12 +127,17 @@ def load_template(template_num: int) -> dict:
 
 
 def apply_inference_overrides(cfg: dict, model: str, car_count: int, seed: int,
-                              exp_num: int, source_exp: int) -> dict:
+                              exp_num: int, source_exp: int, zones=None) -> dict:
     """Turn a cloned training config into a single-episode inference config."""
     env = cfg.setdefault("environment_settings", {})
     env["num_of_cars"] = car_count
     env["seed"] = seed
     env["saving_data_deepness"] = "episode_level"
+    # --zones truncates the coord list. Single zone (huron in-process runs) keeps
+    # everything in one process so the EnergyMeter attributes CPU/GPU cleanly and
+    # num_of_cars is the actual car count (not per-zone).
+    if zones is not None:
+        env["coords"] = env.get("coords", [])[:zones]
 
     cfg.setdefault("algorithm_settings", {})["algorithm"] = model
 
@@ -295,6 +300,10 @@ def main():
     p = argparse.ArgumentParser(description="Generate 10xxx inference-energy experiments.")
     p.add_argument("--dms", nargs="+", default=MODEL_ORDER,
                    help=f"Subset of DMs to generate (default: {MODEL_ORDER}).")
+    p.add_argument("--zones", type=int, default=None,
+                   help="Truncate coords to N zones. Use 1 for huron in-process runs "
+                        "(one process, clean meter attribution); omit to keep the "
+                        "source's zone count.")
     args = p.parse_args()
 
     if not EXP_DIR.exists():
@@ -314,12 +323,12 @@ def main():
             continue
 
         template = load_template(source_exp)
-        n_zones = len(template["environment_settings"]["coords"])
 
         for car_count in CAR_COUNTS:
             for seed in SEEDS:
                 cfg = apply_inference_overrides(
-                    copy.deepcopy(template), model, car_count, seed, exp_num, source_exp)
+                    copy.deepcopy(template), model, car_count, seed, exp_num, source_exp, args.zones)
+                n_zones = len(cfg["environment_settings"]["coords"])
 
                 out_dir = EXP_DIR / f"Exp_{exp_num}"
                 out_dir.mkdir(parents=True, exist_ok=True)
