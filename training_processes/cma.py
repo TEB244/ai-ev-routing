@@ -168,7 +168,11 @@ def train_cma(queue,
                 sim_done, timestep_rewards, _ = environment.simulate_routes()
             station_data, agent_data = environment.get_data()
             queue.put({'tag': 'csv', 'station_data': station_data, 'agent_data': agent_data})
-            reward_val = float(np.mean(timestep_rewards)) if timestep_rewards is not None else 0.0
+            # timestep_rewards may be a torch tensor or numpy array; handle both.
+            if timestep_rewards is None:
+                reward_val = 0.0
+            else:
+                reward_val = float(torch.as_tensor(timestep_rewards).float().mean())
             avg_rewards.append((reward_val, aggregation_num, zone_index, main_seed))
         torch.cuda.empty_cache()
         return [], avg_rewards, [], None
