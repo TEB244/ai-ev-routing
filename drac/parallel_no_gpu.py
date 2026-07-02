@@ -36,7 +36,7 @@ config_general = {
     "omp_num_threads": 2, 
     "data_dir": f"scratch/metrics/Exp",
     "parallel_dir": "experiments/",
-
+    "email": "lhartma8@uwo.ca",
 }
 
 config_cma = {
@@ -93,6 +93,8 @@ def generate_script(config, experiment_list) -> str:
         f"#SBATCH --output={output_log}",
         f"#SBATCH --error={error_log}",
         f"#SBATCH -A {config['account']}",
+        "#SBATCH --mail-type=FAIL,TIME_LIMIT",
+        f"#SBATCH --mail-user={config['email']}",
         f"#SBATCH --ntasks={config['ntasks']}",
         f"#SBATCH --cpus-per-task={cpus_per_task}",
         f"#SBATCH --time={time}",
