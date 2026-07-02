@@ -7,6 +7,8 @@
 #SBATCH --cpus-per-task=5
 #SBATCH --time=11:20:00
 #SBATCH --mem=6G
+#SBATCH --mail-type=FAIL,TIME_LIMIT
+#SBATCH --mail-user=lhartma8@uwo.ca
 
 
 echo "Starting training for experiment 6083"
@@ -19,5 +21,5 @@ source ~/envs/merl_env/bin/activate
 # Enable multi-threading
 export OMP_NUM_THREADS=2
 
-python main.py  -e 6083 -d "/home/sgomezro/scratch/metrics/Exp" 
+python main.py  -e 6083 -d "/home/hartman/scratch/metrics/Exp" 
     
