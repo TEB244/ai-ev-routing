@@ -3,6 +3,8 @@
 #SBATCH --output=experiments/Exp_4089/output.log
 #SBATCH --error=experiments/Exp_4089/error.log
 #SBATCH -A def-mcapretz
+#SBATCH --mail-type=FAIL,TIME_LIMIT
+#SBATCH --mail-user=lhartma8@uwo.ca
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=5
 #SBATCH --time=18:30:00
@@ -19,5 +21,5 @@ source ~/envs/merl_env/bin/activate
 # Enable multi-threading
 export OMP_NUM_THREADS=2
 
-python main.py  -e 4089 -d "/home/sgomezro/links/scratch/metrics/Exp" 
+python main.py  -e 4089 -d "/home/hartman/scratch/metrics/Exp" 
     
