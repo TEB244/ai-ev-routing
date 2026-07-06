@@ -30,6 +30,9 @@ mkdir -p "$CUDA_MPS_PIPE_DIRECTORY" "$CUDA_MPS_LOG_DIRECTORY"
 cleanup_mps() { echo quit | nvidia-cuda-mps-control 2>/dev/null || true; rm -rf "$CUDA_MPS_PIPE_DIRECTORY" "$CUDA_MPS_LOG_DIRECTORY"; }
 trap cleanup_mps EXIT
 nvidia-cuda-mps-control -d
+# Lustre: disable HDF5 file locking so concurrent reads of the shared Exp_3001
+# offline dataset do not fail with 'Unable to get group info (file read failed)'.
+export HDF5_USE_FILE_LOCKING=FALSE
 
 
 python main.py -g 0 -e 6108 -d "/home/hartman/links/scratch/metrics/Exp"
