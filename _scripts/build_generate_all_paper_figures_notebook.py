@@ -590,103 +590,114 @@ with a band showing the spread. Reads the committed `table_data/sensitivity_summ
 (the 7xxx sweep). Set `REGEN_SENSITIVITY = True` to rebuild that summary from raw
 7xxx metrics first (needs the 7xxx runs under a resolvable metrics root)."""))
 )
-cells.append(code(*split_lines(r"""REGEN_SENSITIVITY = False  # True -> rebuild sensitivity_summary.csv from raw 7xxx first
+cells.append(code(*split_lines(r"""# The paper's sensitivity figure (fig_sensitivity_trends.png) is the 2x2 per-DM
+# FACETED view produced by plot_reward_by_dm() in the v2 Sensitivity notebook:
+# seed-averaged final reward vs each swept weight, one panel per DM, one line per
+# swept term. Reproduced from the committed sensitivity_summary.csv (no Huron
+# needed); set REGEN_SENSITIVITY=True to rebuild that summary from raw 7xxx first.
+import csv as _csv
+from pathlib import Path
 
+REGEN_SENSITIVITY = False
 SENS_CSV = os.path.join('table_data', 'sensitivity_summary.csv')
+SWEEP_VALUES = [0, 1, 5, 7, 10]
+SWEPT_VARS = ['distance_weight', 'traffic_weight', 'energy_weight']
 
 if REGEN_SENSITIVITY:
-    # Optional: rebuild the summary from raw 7xxx runs (value-major, seed-minor).
-    SWEEP_VALUES, SEEDS = [0, 1, 5, 7, 10], [1234, 5555, 2020]
-    SWEPT_VARS = ['distance_weight', 'traffic_weight', 'energy_weight']
+    # Rebuild per-experiment reward means from raw 7xxx (value-major, seed-minor).
+    SEEDS = [1234, 5555, 2020]
     MODEL_START = {'DQN': 7000, 'REINFORCE': 7045, 'CMA': 7090, 'ODT': 7135}
     ROOTS = ['../../../../storage_1/metrics', '/storage_1/metrics', '../metrics']
     root = next((r for r in ROOTS if os.path.isdir(r)), None)
-
     def _meta(n):
-        for model, start in MODEL_START.items():
+        for m, start in MODEL_START.items():
             if start <= n < start + 45:
                 off = n - start
-                return (model, SWEPT_VARS[off // 15],
-                        SWEEP_VALUES[(off % 15) // 3], SEEDS[(off % 15) % 3])
+                return m, SWEPT_VARS[off // 15], SWEEP_VALUES[(off % 15) // 3], SEEDS[(off % 15) % 3]
         return None
-
     LAST_N = 50
     recs = []
     if root is not None:
         for n in range(7000, 7180):
-            base = Path(root) / f'Exp_{n}' / 'train'
-            ap, sp = base / 'metrics_agent_episode_level.csv', base / 'metrics_station_episode_level.csv'
-            if not ap.exists() or not sp.exists():
+            ap = Path(root) / f'Exp_{n}' / 'train' / 'metrics_agent_episode_level.csv'
+            if not ap.exists():
                 continue
-            model, var, val, seed = _meta(n)
-            a, s = pd.read_csv(ap), pd.read_csv(sp)
+            m, var, val, seed = _meta(n)
+            a = pd.read_csv(ap, usecols=['aggregation', 'episode', 'reward'])
             pairs = a[['aggregation', 'episode']].drop_duplicates().tail(LAST_N)
             a_t = a.merge(pairs, on=['aggregation', 'episode'])
-            recs.append({'model': model, 'swept_var': var, 'weight': val, 'seed': seed,
-                         'reward_mean': a_t['reward'].mean()})
+            recs.append({'model': m, 'swept_var': var, 'weight': val,
+                         'seed': seed, 'reward_mean': a_t['reward'].mean()})
     if recs:
-        summ = pd.DataFrame(recs)
-        tbl = (summ.groupby(['model', 'swept_var', 'weight'])
-               .agg(reward_mean=('reward_mean', 'mean'),
-                    reward_std=('reward_mean', 'std'),
-                    n_seeds=('seed', 'nunique')).reset_index())
-        tbl['reward'] = tbl.apply(
-            lambda r: f"{r['reward_mean']:.2f} +/- {r['reward_std']:.2f}"
-            if r['n_seeds'] >= 2 else f"{r['reward_mean']:.2f}", axis=1)
-        pivot = tbl.pivot_table(index=['model', 'swept_var'], columns='weight',
-                                values='reward', aggfunc='first')
-        os.makedirs('table_data', exist_ok=True)
-        pivot.to_csv(SENS_CSV)
-        print('rebuilt', SENS_CSV, 'from', len([x for x in recs]), 'runs')
+        summary = pd.DataFrame(recs)
+        print(f'Rebuilt sensitivity summary from {len(recs)} raw 7xxx runs.')
     else:
-        print('No raw 7xxx runs found; using the committed summary CSV.')
+        REGEN_SENSITIVITY = False
+        print('No raw 7xxx runs found; using committed sensitivity_summary.csv.')
 
-# --- Plot the normalized trend figure from the summary CSV. ---
-import csv as _csv
-WEIGHTS = [0, 1, 5, 7, 10]
-BASELINE_IDX = WEIGHTS.index(1)
-VARS = ["distance_weight", "traffic_weight", "energy_weight"]
-LABELS = {"distance_weight": r"distance weight $w_d$",
-          "traffic_weight": r"traffic weight $w_t$",
-          "energy_weight": r"energy weight $w_e$"}
-CLRS = {"distance_weight": "#3a6ea5", "traffic_weight": "#b05454", "energy_weight": "#3f9469"}
-MARKERS = {"distance_weight": "o", "traffic_weight": "s", "energy_weight": "^"}
+if not REGEN_SENSITIVITY:
+    # One row per (model, swept_var, weight); keep the mean from 'mean +/- std'.
+    def _parse_mean(cell):
+        return float(cell.split('+/-')[0].strip())
+    rows = []
+    with open(SENS_CSV, newline='') as f:
+        rr = _csv.reader(f); next(rr)
+        for line in rr:
+            model, var = line[0], line[1]
+            for w, cell in zip(SWEEP_VALUES, line[2:7]):
+                rows.append({'model': model, 'swept_var': var, 'weight': w,
+                             'reward_mean': _parse_mean(cell)})
+    summary = pd.DataFrame(rows)
 
-def _parse_mean(cell):
-    return float(cell.split("+/-")[0].strip())
+# --- Faceted per-DM plot (ports plot_reward_by_dm from the v2 notebook). ---
+def aggregate_over_seeds(df, value_col):
+    g = df.groupby(['model', 'swept_var', 'weight'])[value_col]
+    return g.agg(['mean', 'std', 'count']).reset_index()
 
-sens_rows = {}
-with open(SENS_CSV, newline="") as f:
-    reader = _csv.reader(f)
-    next(reader)
-    for line in reader:
-        sens_rows[(line[0], line[1])] = [_parse_mean(c) for c in line[2:7]]
-sens_models = sorted({m for (m, _v) in sens_rows})
+SINGLE_COL_IN = 3.5
+PAPER_RC = {
+    'font.family': 'serif',
+    'font.serif': ['Times New Roman', 'Times', 'Nimbus Roman', 'Liberation Serif', 'DejaVu Serif'],
+    'mathtext.fontset': 'stix', 'font.size': 8, 'axes.titlesize': 9, 'axes.labelsize': 8,
+    'figure.labelsize': 9, 'xtick.labelsize': 7, 'ytick.labelsize': 7, 'legend.fontsize': 7,
+    'axes.linewidth': 0.6, 'lines.linewidth': 1.0, 'lines.markersize': 3,
+    'xtick.major.size': 2.5, 'ytick.major.size': 2.5, 'xtick.major.width': 0.6,
+    'ytick.major.width': 0.6, 'grid.linewidth': 0.4,
+}
 
-plt.rcParams.update({"font.family": "serif", "font.size": 9,
-                     "mathtext.fontset": "dejavuserif", "axes.linewidth": 0.7})
-fig, ax = plt.subplots(figsize=(3.4, 2.5), dpi=300)
-for var in VARS:
-    curves = np.asarray([np.array(sens_rows[(m, var)]) / sens_rows[(m, var)][BASELINE_IDX]
-                         for m in sens_models])
-    mean, std = curves.mean(axis=0), curves.std(axis=0)
-    ax.plot(WEIGHTS, mean, marker=MARKERS[var], ms=4, lw=1.7, color=CLRS[var], label=LABELS[var])
-    ax.fill_between(WEIGHTS, mean - std, mean + std, color=CLRS[var], alpha=0.15, linewidth=0)
-ax.axhline(1.0, color="#888888", lw=0.7, ls=":")
-ax.set_xlabel("reward-weight value")
-ax.set_ylabel(r"relative penalty (baseline $=1$)")
-ax.set_xticks(WEIGHTS)
-ax.legend(frameon=False, fontsize=8, loc="upper left", handlelength=1.6, labelspacing=0.3)
-ax.grid(True, lw=0.4, alpha=0.4)
-for side in ("top", "right"):
-    ax.spines[side].set_visible(False)
-fig.tight_layout(pad=0.3)
-fig.savefig(outp('fig_sensitivity_trends.png'), bbox_inches="tight")
-plt.show()
-print('wrote', outp('fig_sensitivity_trends.png'))
+def plot_reward_by_dm(df, value_col, ylabel, fname):
+    agg = aggregate_over_seeds(df, value_col)
+    dm_order = [m for m in ['CMA', 'DQN', 'ODT', 'REINFORCE'] if m in agg['model'].unique()]
+    term_colors = {'distance_weight': '#1f77b4', 'traffic_weight': '#d62728', 'energy_weight': '#2ca02c'}
+    term_label = {'distance_weight': 'distance', 'traffic_weight': 'traffic', 'energy_weight': 'energy'}
+    with plt.rc_context(PAPER_RC):
+        fig, axes = plt.subplots(2, 2, figsize=(SINGLE_COL_IN, SINGLE_COL_IN),
+                                 sharex=True, sharey=True, constrained_layout=True)
+        axes_flat = axes.flatten()
+        handles = labels = None
+        for ax, model in zip(axes_flat, dm_order):
+            sub = agg[agg['model'] == model]
+            for sv in SWEPT_VARS:
+                line = sub[sub['swept_var'] == sv].sort_values('weight')
+                if line.empty:
+                    continue
+                ax.plot(line['weight'], line['mean'], marker='o',
+                        color=term_colors.get(sv, 'gray'), label=term_label.get(sv, sv))
+            ax.set_title(model, color=colors.get(model, 'black'), fontweight='bold', pad=2)
+            ax.set_xticks(SWEEP_VALUES); ax.grid(alpha=0.3)
+            if handles is None:
+                handles, labels = ax.get_legend_handles_labels()
+        for ax in axes_flat[len(dm_order):]:
+            ax.set_visible(False)
+        fig.supxlabel('weight value'); fig.supylabel(ylabel)
+        if handles:
+            fig.legend(handles, labels, ncol=3, loc='outside upper center', frameon=False,
+                       columnspacing=1.0, handletextpad=0.4)
+        plt.savefig(outp(fname), dpi=300)
+        plt.show()
 
-# Reset serif override so later cells are unaffected.
-plt.rcParams.update({"font.family": "sans-serif"})"""))
+plot_reward_by_dm(summary, 'reward_mean', 'Mean reward (last episodes)', 'fig_sensitivity_trends.png')
+print('wrote', outp('fig_sensitivity_trends.png'))"""))
 )
 
 # ====================================================================== TABLE combined_metrics
@@ -849,36 +860,38 @@ is static configuration; if a re-tune changes a selection, update it here. Colum
 `kind | hpname | hprange | hpsel` where `kind` is `section` (a per-DM header row)
 or `hp` (a data row)."""))
 )
-cells.append(code(*split_lines(r"""hp_rows = [
-    ("section", "DQN", "", ""),
-    ("hp", "learning rate",
-     r"$10^{-5}$, $10^{-4}$, $10^{-3}$, $3\!\times\!10^{-3}$, $10^{-2}$, $3\!\times\!10^{-2}$, $10^{-1}$",
-     r"$\mathbf{10^{-2}}$"),
-    ("hp", "discount factor", r"$0.90$, $0.95$, $0.99$, $0.995$, $0.999$", r"$0.99$"),
-    ("hp", "replay buffer size", r"$200$, $500$, $1000$", r"$500$"),
-    ("hp", r"target network update freq.\ (ep.)", r"$5$, $10$, $25$, $50$, $100$", r"$25$"),
-    ("hp", r"$\epsilon$-decay episode fraction", r"$0.1$, $0.2$, $0.3$, $0.5$, $0.7$", r"$0.3$"),
-    ("section", "REINFORCE", "", ""),
-    ("hp", "learning rate",
-     r"$10^{-5}$, $10^{-4}$, $10^{-3}$, $3\!\times\!10^{-3}$, $10^{-2}$", r"$\mathbf{10^{-3}}$"),
-    ("hp", "discount factor", r"$0.90$, $0.95$, $0.99$", r"$0.99$"),
+cells.append(code(*split_lines(r"""# Search ranges match the CURRENT v2 sweep; selected values are the OAT
+# recommendations (bolded where the paper bolds). endrule='hline' on the last
+# row of each DM group so csvsimple draws an \hline before the next section.
+LR7 = r"$10^{-5}$, $10^{-4}$, $10^{-3}$, $3\!\times\!10^{-3}$, $10^{-2}$, $3\!\times\!10^{-2}$, $10^{-1}$"
+hp_rows = [
+    ("section", "DQN", "", "", ""),
+    ("hp", "learning rate", LR7, r"$\mathbf{10^{-2}}$", ""),
+    ("hp", "discount factor", r"$0.90$, $0.95$, $0.99$, $0.995$, $0.999$", r"$0.99$", ""),
+    ("hp", "replay buffer size", r"$150$, $500$, $1500$, $5000$, $15000$", r"$500$", ""),
+    ("hp", r"target network update freq.\ (ep.)", r"$5$, $10$, $25$, $50$, $100$", r"$25$", ""),
+    ("hp", r"$\epsilon$-decay episode fraction", r"$0.1$, $0.2$, $0.3$, $0.5$, $0.7$", r"$0.3$", "hline"),
+    ("section", "REINFORCE", "", "", ""),
+    ("hp", "learning rate", LR7, r"$\mathbf{10^{-3}}$", ""),
+    ("hp", "discount factor", r"$0.90$, $0.95$, $0.99$, $0.995$, $0.999$", r"$0.99$", ""),
     ("hp", "hidden layers",
-     r"$[64]$, $[64,64]$, $[128,64]$, $[128,64,64]$, $[256,128]$", r"$\mathbf{[64,64]}$"),
-    ("section", "CMA-ES", "", ""),
-    ("hp", r"initial $\sigma$", r"$0.01$, $0.05$, $0.10$, $0.30$, $1.00$", r"$0.10$"),
-    ("hp", "population size", r"$10$, $20$, $40$, $80$, $100$", r"$20$"),
-    ("hp", "max generations", r"$50$, $100$, $200$, $400$, $800$", r"$200$"),
-    ("section", "ODT", "", ""),
+     r"$[32,32]$, $[64,64]$, $[128,64,64]$, $[256,128,64]$, $[512,256,128,64]$",
+     r"$\mathbf{[64,64]}$", "hline"),
+    ("section", "CMA-ES", "", "", ""),
+    ("hp", r"initial $\sigma$", r"$0.01$, $0.05$, $0.10$, $0.30$, $1.00$", r"$0.10$", ""),
+    ("hp", "population size", r"$10$, $20$, $40$, $80$, $160$", r"$20$", ""),
+    ("hp", "max generations", r"$50$, $100$, $200$, $400$, $800$", r"$200$", "hline"),
+    ("section", "ODT", "", "", ""),
     ("hp", "learning rate",
-     r"$10^{-5}$, $10^{-4}$, $10^{-3}$, $10^{-2}$, $10^{-1}$", r"$\mathbf{10^{-4}}$"),
-    ("hp", r"embedding dim.\ ($d$)", r"$64$, $128$, $256$, $512$, $1024$", r"$512$"),
-    ("hp", "number of layers", r"$1$, $2$, $4$, $6$, $8$", r"$4$"),
-    ("hp", r"context length ($K$)", r"$5$, $10$, $20$, $40$, $80$", r"$10$"),
-    ("hp", "return-to-go target", r"$-30$, $-50$, $-75$, $-100$, $-150$", r"$\mathbf{-50}$"),
+     r"$10^{-5}$, $10^{-4}$, $10^{-3}$, $10^{-2}$, $10^{-1}$", r"$\mathbf{10^{-4}}$", ""),
+    ("hp", r"embedding dim.\ ($d$)", r"$64$, $128$, $256$, $512$, $1024$", r"$512$", ""),
+    ("hp", "number of layers", r"$1$, $2$, $4$, $6$, $8$", r"$4$", ""),
+    ("hp", r"context length ($K$)", r"$5$, $10$, $20$, $40$, $80$", r"$10$", ""),
+    ("hp", "return-to-go target", r"$-30$, $-50$, $-75$, $-100$, $-150$", r"$\mathbf{-50}$", ""),
 ]
 
 write_pipe_csv(outp('table_hp_tuning.csv'),
-               ['kind', 'hpname', 'hprange', 'hpsel'], hp_rows)"""))
+               ['kind', 'hpname', 'hprange', 'hpsel', 'endrule'], hp_rows)"""))
 )
 
 # ====================================================================== Wilcoxon diagnostic
