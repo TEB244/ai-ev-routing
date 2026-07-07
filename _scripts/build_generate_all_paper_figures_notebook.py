@@ -290,7 +290,11 @@ cumulative_agent_df, cumulative_station_df = v2_data.load_env_metrics(cache_dir=
 per_algo, per_algo_byseed = v2_data.reward_summary(cache_dir=V2_CACHE)
 new_rewards = {ALGO_DISPLAY.get(a, a): m
                for a, m in zip(per_algo['algorithm'], per_algo['mean'])}
-rew_stats = {ALGO_DISPLAY.get(r['algorithm'], r['algorithm']): (r['mean'], r['std'])
+# Reward mean stays pooled over experiments; std comes from the per-seed final
+# reward (n = seeds), matching the paper's per-seed +/- (e.g. DQN +/-1.39, not
+# the inflated pooled +/-11.39). per_algo_byseed is already loaded above.
+_byseed_std = per_algo_byseed.set_index('algorithm')['std']
+rew_stats = {ALGO_DISPLAY.get(r['algorithm'], r['algorithm']): (r['mean'], _byseed_std[r['algorithm']])
              for _, r in per_algo.iterrows()}
 
 print('reward curves rows:', len(cumulative_avg_reward_by_algorithm))
@@ -379,7 +383,14 @@ for plot_ind, agg_level in enumerate(agg_levels_sorted):
     ax.set_xlim(0, 10000)
 
 axes[0].set_ylabel('Cumulative Average Reward')
-axes[0].set_ylim(-90, -57)
+# Fit the y-range to the (revised) reward scale rather than a hardcoded window.
+# min/max over the plotted cumulative reward covers both the convergence curves
+# and the season boxes (a subset of the same frame); asymmetric padding keeps a
+# little floor room and more headroom on top, matching the original look.
+_yv = avg_reward_by_algorithm['cumulative_reward']
+_ylo, _yhi = float(_yv.min()), float(_yv.max())
+_yrng = (_yhi - _ylo) or 1.0
+axes[0].set_ylim(_ylo - 0.04 * _yrng, _yhi + 0.10 * _yrng)
 
 # Seasonality subplot over the last stretch of episodes.
 range_bot = 9800
