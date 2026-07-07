@@ -5,6 +5,30 @@ used in the SURE-DM paper. The notebooks are set up to run **as-is on the
 Huron lab server**. If you run them anywhere else you will need to mirror
 Huron's data layout (see [Running off Huron](#running-off-huron) below).
 
+## ⭐ One-shot regeneration: `Generate All Paper Figures.ipynb`
+
+For the IEEE-TSC revision, **`Generate All Paper Figures.ipynb`** is the single
+"run once, regenerate everything" notebook. It consolidates **only** the
+generators for the figures/tables actually used in
+`VERDE/ieee_TSC_revisions/main.tex`, reads the **revised** reward/behaviour data
+(via the `paper_figure_generators_v2` cache) plus the OLD power/time data, and
+writes every output to **`all_v2/`** (instead of `figures/` + `table_data/`).
+
+Run it once on Huron (`Run All`), then upload:
+
+- `all_v2/*.png` → `VERDE/ieee_TSC_revisions/figures/`
+- `all_v2/*.csv` → `VERDE/ieee_TSC_revisions/data/`
+
+and refresh Overleaf. The paper's tables are wired to those CSVs with
+`csvsimple` (`\csvreader`), so they update automatically on refresh. Figure 7
+(`fig_agg_level_train_eval_matrix.png`) is **not** regenerated — no generator for
+it exists; leave that file as is.
+
+The notebook is (re)built by
+`_scripts/build_generate_all_paper_figures_notebook.py`; edit that script and
+re-run it to change the notebook. The per-experiment notebooks below remain the
+authoritative source for each individual figure/table.
+
 ## Quick start (Huron)
 
 1. SSH into Huron and clone this repo somewhere under your home directory, so
