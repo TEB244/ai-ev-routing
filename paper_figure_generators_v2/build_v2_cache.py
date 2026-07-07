@@ -10,12 +10,14 @@ notebooks read.
 Usage (from inside paper_figure_generators_v2/):
     python build_v2_cache.py
     python build_v2_cache.py --metrics-root /storage_1/metrics_postfix
-    python build_v2_cache.py --experiments 4000-4179 --last-n 100
+    python build_v2_cache.py --experiments 4000-4179 --last-n 100   # 3-seed preview
 
 Notes:
-  * Only the 4xxx batch is used (3 seeds, all four seasons, all aggregation
-    levels). 5xxx / 6xxx are intentionally excluded -- they are the 6 seeds
-    still running.
+  * By default the full 9-seed set is used (4xxx + 5xxx + 6xxx: 3 seeds per
+    batch, all four seasons, all aggregation levels). Pass e.g.
+    --experiments 4000-4179 to rebuild only the 3-seed 4xxx preview.
+    Any experiment whose raw metrics_postfix CSV is not found is skipped and
+    listed in _BUILD_INFO.txt (missing_list) -- check that after building.
   * Reward and in-simulation behaviour come from this new data. Training time,
     power, CO2 and model size are NOT touched here; those stay on the old data
     inside the Experiment 3 notebook.
@@ -32,7 +34,7 @@ import v2_data  # noqa: E402
 
 def parse_experiments(spec):
     if not spec:
-        return v2_data.EXPERIMENTS_4XXX
+        return v2_data.EXPERIMENTS_ALL
     out = []
     for part in spec.split(","):
         part = part.strip()
@@ -50,7 +52,8 @@ def main():
     p.add_argument("--metrics-root", default=None,
                    help="Override metrics_postfix root (default: auto-detect).")
     p.add_argument("--experiments", default=None,
-                   help="Ranges/ids, e.g. '4000-4179' (default: 4000-4179).")
+                   help="Ranges/ids, e.g. '4000-4179' "
+                        "(default: 4000-4179,5000-5179,6000-6179 = 9 seeds).")
     p.add_argument("--last-n", type=int, default=v2_data.DEFAULT_LAST_N_EPISODES,
                    help="Trailing episodes treated as steady-state (default: 100).")
     p.add_argument("--out", default=str(v2_data.CACHE_DIR),

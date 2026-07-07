@@ -50,9 +50,17 @@ from environment.data_loader import load_config_file
 
 # Revised main batch: 4xxx is a *complete* grid on its own
 # (4 seasons x 4 decision-makers x 3 aggregation levels x 3 seeds = 180 exps).
-# The published figures pool 4xxx+5xxx+6xxx = 9 seeds; this previews trends with
-# the 3 seeds of 4xxx while 5xxx/6xxx finish.
+# 4xxx alone previews trends with 3 seeds; the published figures pool
+# 4xxx+5xxx+6xxx = 9 seeds (see EXPERIMENTS_ALL).
 EXPERIMENTS_4XXX = list(range(4000, 4180))
+
+# Full published set: 4xxx + 5xxx + 6xxx = 9 seeds (3 per batch), all four
+# seasons and all aggregation levels. 5xxx/6xxx have finished running; build the
+# cache over this range to move the reward / in-simulation-behaviour figures and
+# tables from the 3-seed preview to the full 9-seed results. This is the default.
+EXPERIMENTS_ALL = (list(range(4000, 4180))
+                   + list(range(5000, 5180))
+                   + list(range(6000, 6180)))
 
 # NEW post-fix raw metrics (the data that was just rerun). Tried in order.
 NEW_METRICS_ROOT_CANDIDATES = [
@@ -212,7 +220,7 @@ def _final_reward_one(agent_path, meta, last_n):
 # One-pass cache build (used by build_v2_cache.py)
 # --------------------------------------------------------------------------
 
-def build_cache(new_root=None, experiments=EXPERIMENTS_4XXX,
+def build_cache(new_root=None, experiments=EXPERIMENTS_ALL,
                 last_n=DEFAULT_LAST_N_EPISODES, out_dir=CACHE_DIR, verbose=True):
     """Single pass over the 4xxx runs: read each raw CSV once, write the small
     intermediates the notebooks consume. Returns the list of missing exps."""
