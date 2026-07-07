@@ -1,0 +1,21 @@
+kind|hpname|hprange|hpsel|endrule
+section|DQN|||
+hp|learning rate|$10^{-5}$, $10^{-4}$, $10^{-3}$, $3\!\times\!10^{-3}$, $10^{-2}$, $3\!\times\!10^{-2}$, $10^{-1}$|$\mathbf{10^{-2}}$|
+hp|discount factor|$0.90$, $0.95$, $0.99$, $0.995$, $0.999$|$0.99$|
+hp|replay buffer size|$150$, $500$, $1500$, $5000$, $15000$|$500$|
+hp|target network update freq.\ (ep.)|$5$, $10$, $25$, $50$, $100$|$25$|
+hp|$\epsilon$-decay episode fraction|$0.1$, $0.2$, $0.3$, $0.5$, $0.7$|$0.3$|hline
+section|REINFORCE|||
+hp|learning rate|$10^{-5}$, $10^{-4}$, $10^{-3}$, $3\!\times\!10^{-3}$, $10^{-2}$, $3\!\times\!10^{-2}$, $10^{-1}$|$\mathbf{10^{-3}}$|
+hp|discount factor|$0.90$, $0.95$, $0.99$, $0.995$, $0.999$|$0.99$|
+hp|hidden layers|$[32,32]$, $[64,64]$, $[128,64,64]$, $[256,128,64]$, $[512,256,128,64]$|$\mathbf{[64,64]}$|hline
+section|CMA-ES|||
+hp|initial $\sigma$|$0.01$, $0.05$, $0.10$, $0.30$, $1.00$|$0.10$|
+hp|population size|$10$, $20$, $40$, $80$, $160$|$20$|
+hp|max generations|$50$, $100$, $200$, $400$, $800$|$200$|hline
+section|ODT|||
+hp|learning rate|$10^{-5}$, $10^{-4}$, $10^{-3}$, $10^{-2}$, $10^{-1}$|$\mathbf{10^{-4}}$|
+hp|embedding dim.\ ($d$)|$64$, $128$, $256$, $512$, $1024$|$512$|
+hp|number of layers|$1$, $2$, $4$, $6$, $8$|$4$|
+hp|context length ($K$)|$5$, $10$, $20$, $40$, $80$|$10$|
+hp|return-to-go target|$-30$, $-50$, $-75$, $-100$, $-150$|$\mathbf{-50}$|
