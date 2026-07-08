@@ -702,7 +702,7 @@ def plot_reward_by_dm(df, value_col, ylabel, fname):
             ax.set_visible(False)
         fig.supxlabel('weight value'); fig.supylabel(ylabel)
         if handles:
-            fig.legend(handles, labels, ncol=3, loc='outside upper center', frameon=False,
+            fig.legend(handles, labels, ncol=3, loc='outside lower center', frameon=False,
                        columnspacing=1.0, handletextpad=0.4)
         plt.savefig(outp(fname), dpi=300)
         plt.show()
