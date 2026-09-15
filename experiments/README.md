@@ -1,385 +1,232 @@
-# Experiments — reference
+# Experiments
 
-This file documents every active experiment batch in the paper-revision
-workflow. For older batches (Exp_0xxx, 1xxx, 2xxx) see
-`experiment_list.txt` — those pre-date the current revision and are not
-part of the rerun.
+Every VERDE run is defined by a numbered directory in here. `main.py -e <NNNN>`
+resolves to `experiments/Exp_<NNNN>/config.yaml`, so the experiment number is the
+only handle needed to run, track, or analyse a run.
 
-## Workflow overview
+Each directory contains:
 
-The paper revision involves rerunning a substantial fraction of the
-experiments after fixing several bugs (see "Global changes" below). The
-dependency order is:
+| File | Contents |
+|---|---|
+| `config.yaml` | The full experiment definition. See the Configuration section of the [root README](../README.md#configuration). |
+| `description.txt` | Human-readable summary: seed, DM, season, fleet size, episode and aggregation counts. |
+| `train_job.sh` | SLURM submission script for training. |
+| `eval_job.sh` | SLURM submission script for evaluation. |
+| `train_job_gpu.sh` | GPU variant, present where the DM benefits from one. |
 
-```
-  9xxx HP tuning ─┬─→ HP analysis → recommended HP values
-                  │                      │
-                  │                      ▼
-                  └────→ apply to 4xxx/5xxx/6xxx/7xxx/8xxx configs
-                                         │
-                ┌────────────────────────┼────────────────────────┐
-                ▼                        ▼                        ▼
-        4xxx/5xxx/6xxx              7xxx                       8xxx
-        (main experiments)       (sensitivity)             (bulletproofing)
-                │                        │                        │
-                └────────────────────────┼────────────────────────┘
-                                         ▼
-                         Re-run paper figure-generator notebooks
-                                         │
-                                         ▼
-                                   Final paper data
-```
+Experiment *outputs* are not stored here. Runs write their metrics to the path given
+by `main.py -d` — on the cluster a scratch directory, on the lab server a path under
+`/storage_1/`. This directory holds definitions only.
 
-## Algorithm → owner mapping
+> `config.yaml` is authoritative. A few `description.txt` files in the ODT blocks
+> carry a stale `Model:` line inherited from the template they were copied from;
+> trust the `algorithm_settings.algorithm` field in the config.
 
-| Algorithm | Owner | SLURM user | Scratch path |
-|---|---|---|---|
-| DQN | Lucas Hartman | `hartman` (cluster) / `lhartma8` (mail) | `/home/hartman/scratch/metrics/` |
-| REINFORCE | Lucas Hartman | `hartman` | `/home/hartman/scratch/metrics/` |
-| CMA | Santiago Gomez-Rosero | `sgomezro` | `/home/sgomezro/scratch/metrics/` |
-| ODT | Lucas Hartman (formerly Ethan Pigou) | `hartman` | `/home/hartman/scratch/metrics/` |
+## Numbering scheme
 
-`check_progress.py` and `plot_reward_curve.py` auto-detect the owner
-from the config's algorithm and look in the right scratch path.
+There are 1,525 experiment directories. The leading digit identifies the batch, and
+the paper's results come from the **4xxx and above** ranges — roughly 950 runs. The
+rest is exploratory work kept for provenance.
 
-## Global changes affecting all 4xxx–9xxx batches
+| Range | Count | Purpose |
+|---|---|---|
+| `Exp_0001`–`Exp_0479` | 198 | Early exploratory runs, used to settle episode and aggregation counts. Sparse — the range has gaps. Pre-dates the paper's experimental design. |
+| `Exp_1000`–`Exp_1066` | 52 | Superseded exploratory batch. Sparse. |
+| `Exp_2000`–`Exp_2143` | 144 | Superseded exploratory batch. |
+| `Exp_3000`–`Exp_3002` | 3 | Offline trajectory generation for ODT. Produces the `.h5` datasets ODT experiments pretrain on. |
+| `Exp_4000`–`Exp_4179` | 180 | **Main experiments, seed batch 1.** |
+| `Exp_5000`–`Exp_5179` | 180 | **Main experiments, seed batch 2.** |
+| `Exp_6000`–`Exp_6179` | 180 | **Main experiments, seed batch 3.** |
+| `Exp_7000`–`Exp_7179` | 180 | **Reward-weight sensitivity analysis.** |
+| `Exp_8000`–`Exp_8026` | 27 | **Single-term reward ablation** (diagonal-dominance check). |
+| `Exp_9000`–`Exp_9326` | 327 | **Hyperparameter tuning**, v1 and v2 sweeps. |
+| `Exp_9994`–`Exp_9999` | 6 | Ad-hoc debug slots. No descriptions, not part of any result. |
+| `Exp_10000`–`Exp_10047` | 48 | **Inference-energy profiling**, for the deployment-cost analysis. |
 
-These were applied across every config in the rerun ranges as part of
-the revision:
+The 0xxx/1xxx/2xxx batches are kept for provenance. No paper figure or table reads
+them; the figure notebooks only touch 4xxx and above.
 
-1. **Action space discretised to 5 mix profiles.**
-   `environment_settings.action_dim = 5`. The agent argmax-selects one of
-   5 distance/traffic mix profiles per state, with mix coefficient
-   `w_i = i/(N-1)` for `i ∈ {0, 1, 2, 3, 4}`:
-   - 0: `(distance_mult, traffic_mult) = (1.0, 0.0)`  pure-distance
-   - 1: `(0.75, 0.25)`  lean-distance
-   - 2: `(0.5, 0.5)`    balanced
-   - 3: `(0.25, 0.75)`  lean-traffic
-   - 4: `(0.0, 1.0)`    pure-traffic
+> **The experiment-number → (DM, seed, season, aggregation level) mapping is
+> load-bearing.** The analysis notebooks index results by experiment number, so
+> renumbering a batch silently invalidates every figure derived from it.
 
-2. **Reward weights pinned at `(1, 1, 1)`** with unit-conversion scales
-   `(distance_scale=100, traffic_scale=1, energy_scale=0.001)`. See
-   `paper_figure_generators/Sensitivity Analysis.ipynb` Part 3.
+## Main experiments — 4xxx / 5xxx / 6xxx
 
-3. **Bug fixes baked in** (cannot be turned off): DQN loss now gathers
-   the chosen action's Q-value, REINFORCE uses a cross-episode EMA
-   baseline, state normalisation uses fixed per-feature scaling, and the
-   env's `generate_paths` consumes argmax(action) rather than continuous
-   weights. See the commit log for `952c22fe` and `6e17ed41`.
+The three batches are **seed batches, not season batches**. Each one is a complete
+180-experiment grid spanning all four seasons, and the published figures pool all
+three to give nine seeds per DM:
 
-4. **Hyperparameter bumps** applied across all configs:
-   `learning_rate: 1e-5 → 1e-3`, `buffer_limit: 150 → 1500`,
-   `discount_factor: 0.999 → 0.99`. Will be re-applied after 9xxx HP
-   tuning completes with the empirically tuned values.
+| Batch | Seeds |
+|---|---|
+| 4xxx | 1234, 5555, 2020 |
+| 5xxx | 2468, 4040, 11110 |
+| 6xxx | 3702, 6060, 16665 |
 
-5. **SLURM wall times bumped by +5h** on every DQN/REINFORCE
-   `train_job.sh`. DQN now 13h, REINFORCE 21h (for the longer 10000-ep
-   configs in 4xxx/5xxx/6xxx).
+All three share the same internal layout. Taking 4xxx as the example:
 
----
+| Range | DM | Count |
+|---|---|---|
+| 4000–4035 | DQN | 36 |
+| 4036–4071 | REINFORCE | 36 |
+| 4072–4107 | CMA | 36 |
+| 4108–4179 | ODT | 72 |
 
-## Exp_3xxx — Offline data generation for ODT
+Within a DM block the ordering is season-major, then federated aggregation level,
+then seed:
 
-| Status | Range | Algorithm | Count | Purpose |
-|---|---|---|---|---|
-| **PENDING (Lucas)** | `Exp_3001` | DQN | 1 | DQN at tuned HPs with `save_offline_data: true`. Produces the offline `.h5` trajectories every ODT experiment pretrains on. |
-| **PENDING (Lucas, optional)** | `Exp_3002` | REINFORCE | 1 | REINFORCE counterpart. Alternate offline source for future ODT comparisons; not used by the current rerun. |
+- **Season** (4): spring, winter, summer, autumn
+- **Aggregation level** (3): `aggregation_count` of 50, 10, then 1
+- **Seed** (3): the batch's three seeds, in the order listed above
 
-Required before any ODT experiment (in 4xxx, 5xxx, 6xxx, 7xxx, 9xxx)
-can produce meaningful results, because the previous `Exp_3000`
-offline data was generated by a pre-fix DQN with a 3-element action
-space.
+So 4000–4002 are spring / 50 aggregations / the three seeds; 4003–4005 are spring /
+10 aggregations; 4006–4008 are spring / 1 aggregation; 4009 starts winter. ODT
+occupies twice the span because it is run in two configurations.
 
-Both experiments use the tuned post-HP-tuning HPs:
-- Exp_3001 (DQN): `learning_rate=0.01, discount_factor=0.99, buffer_limit=500, target_network_update_frequency=25, target_episode_epsilon_frac=0.3`
-- Exp_3002 (REINFORCE): `learning_rate=0.001, discount_factor=0.99, layers=[64, 64]`
+These batches produce the main results table, the convergence and seasonal reward
+figures, the sustainability indicator, and the cross-zone adaptation results.
 
-Both run at full scope (4 zones, 10000 episodes per zone, 100 cars,
-spring season, `action_dim=5`, reward weights `(1, 1, 1)`).
+## Sensitivity analysis — 7xxx
 
-### Workflow for the offline dataset
+Sweeps each of the three reward weights over `{0, 1, 5, 7, 10}` per DM, three seeds
+per cell, to show the DM ranking is preserved under perturbation of the `(1, 1, 1)`
+baseline.
 
-```
-Lucas runs Exp_3001 on DRAC (hartman account)
-       │
-       ▼
-Data lands at /home/hartman/scratch/metrics/Exp_3001/data_zone_*.h5
-       │
-       ▼
-Lucas rsyncs the .h5 files to /home/epigou/scratch/metrics/Exp_3001/
-       │
-       ▼
-Ethan submits ODT experiments — every ODT config already points at
-/home/epigou/scratch/metrics/Exp_3001/ via odt_hyperparameters.offline_dataset_path
-```
-
-### Submission
-
-```bash
-# Lucas
-sbatch experiments/Exp_3001/train_job.sh   # DQN data generation, ~13h
-sbatch experiments/Exp_3002/train_job.sh   # REINFORCE data generation, ~21h (optional)
-```
-
-After Exp_3001 finishes (only Exp_3001 is required for the rerun):
-
-```bash
-# Lucas, on DRAC, transfer data to Ethan's scratch
-ssh narval
-rsync -av --include='data_zone_*.h5' --include='*/' --exclude='*' \
-    ~/scratch/metrics/Exp_3001/ /home/epigou/scratch/metrics/Exp_3001/
-```
-
-(If cross-user write permission isn't available, transfer locally via
-huron or via a shared `/project/def-mcapretz/` path that both can write.)
-
----
-
-## Exp_4xxx, Exp_5xxx, Exp_6xxx — Main paper experiments (rerun pending)
-
-| Status | Range | Algorithms | Count | Purpose |
-|---|---|---|---|---|
-| **RERUN PENDING** (waiting on HP tuning) | 4000–4179 | DQN(36) + REINFORCE(36) + CMA(36) + ODT(72) | 180 | Original Experiments 1/2 (spring), per seed × per car_model_zone combination. |
-| **RERUN PENDING** | 5000–5179 | same split | 180 | Same as 4xxx for season 2 (winter). |
-| **RERUN PENDING** | 6000–6179 | same split | 180 | Same as 4xxx for season 3 (summer). |
-
-These produce the data behind Table I, Figures 2/3/4, the sustainability
-analysis (Figure 5), and the cross-zone adaptation results in the
-original paper. All three batches need to be rerun with the post-fix
-code, the tuned HPs from 9xxx, and the new 5-profile action space.
-
-**Total: 540 experiments across the three seasons.**
-
-### Layout per batch (4xxx as the example)
-
-Within 4000–4179 the original layout is one experiment per
-`(model, seed, car_model_zone)` combination. The exact mapping is in
-`experiment_list.txt` under the old "Set Name" entries. **Do not touch
-the experiment-number → (model, seed) mapping** during the rerun — the
-paper's analysis notebooks index by that mapping.
-
-Wall times (per job): DQN 13h, REINFORCE 21h, CMA 10h40m, ODT 30h.
-
-### Submission (after HP analysis is complete)
-
-```bash
-# DQN + REINFORCE (Lucas)
-for n in $(seq 4000 4071); do sbatch experiments/Exp_${n}/train_job.sh; done
-
-# CMA (Santiago)
-for n in $(seq 4072 4107); do sbatch experiments/Exp_${n}/train_job.sh; done
-
-# ODT (Ethan)
-for n in $(seq 4108 4179); do sbatch experiments/Exp_${n}/train_job.sh; done
-```
-
-Same pattern for 5xxx and 6xxx (winter and summer).
-
----
-
-## Exp_7000–7179 — Sensitivity analysis (rerun pending)
-
-| Status | Range | Algorithms | Count | Purpose |
-|---|---|---|---|---|
-| **RERUN PENDING** | 7000–7179 | 45 per algo | 180 | Reward-weight sensitivity sweep. |
-
-Sweeps each of the three reward weights (`distance_weight`,
-`traffic_weight`, `energy_weight`) over `{0, 1, 5, 7, 10}` for each
-algorithm, with 3 seeds per cell. Justifies the chosen
-`(distance_weight=1, traffic_weight=1, energy_weight=1)` baseline by
-showing DM ranking is preserved under perturbation.
-
-### Layout
-
-| Range | Model | distance_weight sweep | traffic_weight sweep | energy_weight sweep |
+| Range | DM | `distance_weight` | `traffic_weight` | `energy_weight` |
 |---|---|---|---|---|
 | 7000–7044 | DQN | 7000–7014 | 7015–7029 | 7030–7044 |
 | 7045–7089 | REINFORCE | 7045–7059 | 7060–7074 | 7075–7089 |
 | 7090–7134 | CMA | 7090–7104 | 7105–7119 | 7120–7134 |
 | 7135–7179 | ODT | 7135–7149 | 7150–7164 | 7165–7179 |
 
-Within each 15-experiment sweep, ordering is value-major / seed-minor:
-offsets +0..+2 use weight=0 (ablation), +3..+5 use weight=1 (baseline),
-+6..+8 use weight=5, +9..+11 use weight=7, +12..+14 use weight=10.
-Seeds within each triplet: 1234, 5555, 2020.
+Within each 15-experiment sweep the ordering is value-major / seed-minor: offsets
++0…+2 use weight 0, +3…+5 use weight 1 (the baseline), +6…+8 use 5, +9…+11 use 7,
++12…+14 use 10. Seeds within each triplet are 1234, 5555, 2020.
 
-Generated by `generate_sensitivity_experiments.py`. Analysis in
-`paper_figure_generators/Sensitivity Analysis.ipynb` (Parts 1, 2, 3).
+## Single-term reward ablation — 8xxx
 
----
+Each run trains against a reward containing exactly one term, testing whether the
+agent genuinely optimises the reward it is given: the metric matching the active
+term should be lowest in its own cell.
 
-## Exp_8000–8026 — Bulletproofing / single-term reward (rerun pending)
-
-| Status | Range | Algorithms | Count | Purpose |
-|---|---|---|---|---|
-| **RERUN PENDING** | 8000–8026 | DQN(9) + REINFORCE(9) + CMA(9) | 27 | Defends the sensitivity result against the "agents aren't really optimising the reward" critique. |
-
-Each experiment trains an agent with a reward that contains exactly ONE
-term (`distance_only` = `(1, 0, 0)`, `traffic_only` = `(0, 1, 0)`,
-`energy_only` = `(0, 0, 1)`). If the agent actually optimises the
-reward, the metric matching the active term should be lowest in its own
-cell — the diagonal-dominance test.
-
-### Layout
-
-| Range | Model | Reward shape |
+| Range | DM | Reward |
 |---|---|---|
-| 8000–8002 | DQN | distance-only |
-| 8003–8005 | DQN | traffic-only |
-| 8006–8008 | DQN | energy-only |
-| 8009–8011 | REINFORCE | distance-only |
-| 8012–8014 | REINFORCE | traffic-only |
-| 8015–8017 | REINFORCE | energy-only |
-| 8018–8020 | CMA | distance-only |
-| 8021–8023 | CMA | traffic-only |
-| 8024–8026 | CMA | energy-only |
+| 8000–8002 | DQN | distance only `(1, 0, 0)` |
+| 8003–8005 | DQN | traffic only `(0, 1, 0)` |
+| 8006–8008 | DQN | energy only `(0, 0, 1)` |
+| 8009–8017 | REINFORCE | the same three shapes, in the same order |
+| 8018–8026 | CMA | the same three shapes, in the same order |
 
-Seeds within each triplet: 1234, 5555, 2020. ODT excluded due to
-compute cost; could be added later if 3-DM result is inconclusive.
+Seeds 1234, 5555, 2020 within each triplet. ODT is excluded on compute cost.
 
-Generated by `generate_bulletproofing_experiments.py`. Analysis in
-`paper_figure_generators/Bulletproofing.ipynb`.
+## Hyperparameter tuning — 9xxx
 
----
+One-at-a-time sweeps, five values per hyperparameter, three seeds per cell, at
+reduced scope (one zone, spring only, 25 RL aggregations, reward weights pinned at
+`(1, 1, 1)`). The centre value of each sweep matches the default, so the centre
+cells are functionally identical across sweeps for a given DM and seed.
 
-## Exp_9000–9179 — Hyperparameter tuning v1 (DQN + REINFORCE completed; CMA + ODT in progress)
+**v1 — `Exp_9000`–`Exp_9179`**, 45 per DM as three sweeps of 15:
 
-| Status | Range | Algorithm | Count | Purpose |
+| Range | DM | Sweep 1 | Sweep 2 | Sweep 3 |
 |---|---|---|---|---|
-| **DONE** | 9000–9044 | DQN | 45 | HP tuning: lr / discount_factor / buffer_limit |
-| **DONE** | 9045–9089 | REINFORCE | 45 | HP tuning: lr / discount_factor / layers_arch |
-| **PENDING (Santiago)** | 9090–9134 | CMA | 45 | HP tuning: initial_sigma / population_dimension / max_generations |
-| **PENDING (Ethan)** | 9135–9179 | ODT | 45 | HP tuning: lr / embed_dim / n_layer |
+| 9000–9044 | DQN | `learning_rate` | `discount_factor` | `buffer_limit` |
+| 9045–9089 | REINFORCE | `learning_rate` | `discount_factor` | `layers_arch` |
+| 9090–9134 | CMA | `initial_sigma` | `population_dimension` | `max_generations` |
+| 9135–9179 | ODT | `learning_rate` | `embed_dim` | `n_layer` |
 
-180 experiments total. One-at-a-time (OAT) sweeps over 3 HPs per
-algorithm, 5 values per HP, 3 seeds per cell.
+**v2 — `Exp_9180`–`Exp_9251`**, covering hyperparameters v1 missed and extending the
+learning-rate range past v1's upper edge. Every v2 config pins the v1-tuned values
+for non-swept hyperparameters so the operating point matches.
 
-### Layout per algorithm
-
-Each algorithm's 45 experiments split into 3 sweeps of 15 each
-(5 values × 3 seeds, value-major / seed-minor).
-
-| Range | Algorithm | HP 1 (15 exps each) | HP 2 | HP 3 |
-|---|---|---|---|---|
-| 9000–9044 | DQN | `learning_rate` ∈ {1e-5, 1e-4, 1e-3, 3e-3, 1e-2} | `discount_factor` ∈ {0.90, 0.95, 0.99, 0.995, 0.999} | `buffer_limit` ∈ {150, 500, 1500, 5000, 15000} |
-| 9045–9089 | REINFORCE | same as DQN | same as DQN | `layers_arch` (5 preset architectures) |
-| 9090–9134 | CMA | `initial_sigma` ∈ {0.01, 0.05, 0.10, 0.30, 1.00} | `population_dimension` ∈ {10, 20, 40, 80, 100} | `max_generations` ∈ {50, 100, 200, 400, 800} |
-| 9135–9179 | ODT | `learning_rate` ∈ {1e-5, 1e-4, 1e-3, 1e-2, 1e-1} | `embed_dim` ∈ {64, 128, 256, 512, 1024} | `n_layer` ∈ {1, 2, 4, 6, 8} |
-
-The centre value of each sweep (offset +6,+7,+8 within the 15-block)
-matches the post-fix default, so three centre cells per (algorithm,
-seed) are functionally identical.
-
-Reduced compute scope per experiment: 1 zone, spring only, 25 RL
-aggregations (12.5k transitions total per car), reward weights pinned
-at `(1, 1, 1)`.
-
-Generated by `generate_hp_tuning_experiments.py`. Analysis in
-`paper_figure_generators/Hyperparameter Tuning.ipynb`.
-
-### Submission
-
-```bash
-# DQN (Lucas) — DONE
-for n in $(seq 9000 9044); do sbatch experiments/Exp_${n}/train_job.sh; done
-
-# REINFORCE (Lucas) — DONE
-for n in $(seq 9045 9089); do sbatch experiments/Exp_${n}/train_job.sh; done
-
-# CMA (Santiago)
-for n in $(seq 9090 9134); do sbatch experiments/Exp_${n}/train_job.sh; done
-
-# ODT (Ethan) — wait for offline data (Exp_3001) before submitting
-for n in $(seq 9135 9179); do sbatch experiments/Exp_${n}/train_job.sh; done
-```
-
----
-
-## Exp_9180–9251 — Hyperparameter tuning v2 / extension (pending)
-
-| Status | Range | Algorithm | Count | Purpose |
-|---|---|---|---|---|
-| **PENDING (Lucas)** | 9180–9215 | DQN | 36 | Adds literature-impactful HPs the v1 sweep missed + extends lr range above v1's upper edge. |
-| **PENDING (Lucas)** | 9216–9221 | REINFORCE | 6 | Extends lr range above v1's upper edge. |
-| **PENDING (Ethan)** | 9222–9251 | ODT | 30 | Adds context length K and return-to-go (RTG) conditioning — the two HPs every DT paper tunes. |
-
-72 experiments total. Same reduced compute scope as v1. Every v2 config
-explicitly sets the v1-tuned values for non-swept HPs so the operating
-point matches v1.
-
-### Layout
-
-| Range | Algorithm | Swept HP | Values |
+| Range | DM | Swept | Values |
 |---|---|---|---|
 | 9180–9194 | DQN | `target_network_update_frequency` | 5, 10, 25, 50, 100 |
 | 9195–9209 | DQN | `target_episode_epsilon_frac` | 0.1, 0.2, 0.3, 0.5, 0.7 |
-| 9210–9215 | DQN | `learning_rate` EXTENSION | 3e-2, 1e-1 |
-| 9216–9221 | REINFORCE | `learning_rate` EXTENSION | 3e-2, 1e-1 |
+| 9210–9215 | DQN | `learning_rate` (extension) | 3e-2, 1e-1 |
+| 9216–9221 | REINFORCE | `learning_rate` (extension) | 3e-2, 1e-1 |
 | 9222–9236 | ODT | `K` (context length) | 5, 10, 20, 40, 80 |
-| 9237–9251 | ODT | `rtg` (online_rtg + eval_rtg paired) | -30, -50, -75, -100, -150 |
+| 9237–9251 | ODT | `rtg` (online and eval, paired) | -30, -50, -75, -100, -150 |
 
-Within each block: 3 seeds per value (1234, 5555, 2020), value-major /
-seed-minor ordering.
+CMA has no v2 sweeps — its three canonical hyperparameters were fully covered by v1.
 
-CMA has no v2 additions — its three canonical HPs were fully covered
-by v1.
+**ODT re-run — `Exp_9252`–`Exp_9326`**, repeating all five ODT sweeps (v1
+`learning_rate` / `embed_dim` / `n_layer`, then v2 `K` / `rtg`) under
+`forward_mode: sequential`:
 
-Generated by `generate_hp_tuning_v2_experiments.py`. Shares analysis
-notebook with v1 (`Hyperparameter Tuning.ipynb` understands both
-ranges).
+| Range | Swept |
+|---|---|
+| 9252–9266 | `learning_rate` |
+| 9267–9281 | `embed_dim` |
+| 9282–9296 | `n_layer` |
+| 9297–9311 | `K` |
+| 9312–9326 | `rtg` |
 
-### Submission
+## Inference-energy profiling — 10xxx
 
-```bash
-# DQN (Lucas)
-for n in $(seq 9180 9215); do sbatch experiments/Exp_${n}/train_job.sh; done
+Inference-only runs: forward passes from pretrained weights with no gradient step,
+used to measure deployment energy against training energy. Four DMs × four fleet
+sizes × three seeds:
 
-# REINFORCE (Lucas)
-for n in $(seq 9216 9221); do sbatch experiments/Exp_${n}/train_job.sh; done
+| Range | DM |
+|---|---|
+| 10000–10011 | DQN |
+| 10012–10023 | REINFORCE |
+| 10024–10035 | CMA |
+| 10036–10047 | ODT |
 
-# ODT (Ethan)
-for n in $(seq 9222 9251); do sbatch experiments/Exp_${n}/train_job.sh; done
+Within each block, fleet size varies 50 → 100 → 150 → 200 cars, three seeds per
+size. Each run loads pretrained weights from the corresponding 4xxx experiment,
+named in its `description.txt`.
+
+These feed [`fit_inference_regression.py`](../fit_inference_regression.py) and
+[`fit_inference_inproc.py`](../fit_inference_inproc.py), which fit the inference
+energy model used in the deployment analysis.
+
+## Regenerating a batch
+
+The 7xxx, 8xxx and 9xxx batches are generated, not hand-written. The generators are
+idempotent, so re-running one rewrites its configs and job scripts in place:
+
+```sh
+python generate_sensitivity_experiments.py      # 7000-7179
+python generate_bulletproofing_experiments.py   # 8000-8026
+python generate_hp_tuning_experiments.py        # 9000-9179
+python generate_hp_tuning_v2_experiments.py     # 9180-9251
 ```
 
----
+Run [`validate_batch.py`](../validate_batch.py) over a batch before submitting it.
 
-## Tooling reference
+## Which notebook reads which range
 
-| Script | Purpose |
+All notebooks live in [`../paper_figure_generators/`](../paper_figure_generators/).
+`Generate All Paper Figures.ipynb` is the single entry point that regenerates every
+paper output; the per-experiment notebooks below remain the authoritative source for
+each individual figure or table.
+
+| Notebook | Reads |
 |---|---|
-| `check_progress.py <exp_num>` | Print %-complete, current aggregation, last-100-ep mean reward, SLURM state, ETA. Auto-detects owner from config. |
-| `paper_figure_generators/plot_reward_curve.py <exp_num>` | Save a PNG of the training reward curve for one experiment. Auto-detects metrics path. |
-| `generate_sensitivity_experiments.py` | Regenerate configs and job files for 7xxx (idempotent). |
-| `generate_bulletproofing_experiments.py` | Regenerate configs and job files for 8xxx. |
-| `generate_hp_tuning_experiments.py` | Regenerate configs and job files for 9000–9179 (v1). |
-| `generate_hp_tuning_v2_experiments.py` | Regenerate configs and job files for 9180–9251 (v2). |
-| `_scripts/build_sensitivity_notebook.py` | Rebuild `Sensitivity Analysis.ipynb`. |
-| `_scripts/build_bulletproofing_notebook.py` | Rebuild `Bulletproofing.ipynb`. |
-| `_scripts/build_hp_tuning_notebook.py` | Rebuild `Hyperparameter Tuning.ipynb`. |
-| `_scripts/patch_sensitivity_notebook.py` | Add or refresh Part 3 of `Sensitivity Analysis.ipynb` (reward-weight recommendation). |
+| `Experiment 1 Figures.ipynb` | 4xxx, 5xxx, 6xxx — convergence and training curves |
+| `Experiment 2 Figures.ipynb` | 4xxx, 5xxx, 6xxx — per-DM per-season metrics table |
+| `Experiment 3 Figures.ipynb` | 4xxx, 5xxx, 6xxx — sustainability indicator |
+| `Discussion Figures.ipynb` | derived data — DM behaviour profiles |
+| `Sensitivity Analysis.ipynb` | 7xxx |
+| `Bulletproofing.ipynb` | 8xxx, plus free analyses over 7xxx |
+| `Hyperparameter Tuning.ipynb` | 9xxx (understands the v1 and v2 ranges) |
 
-## Analysis notebooks (in `paper_figure_generators/`)
+`plot_reward_curve.py <exp_num>` saves the training reward curve for a single
+experiment, and [`check_progress.py`](../check_progress.py) reports progress and
+SLURM state for an in-flight run.
 
-| Notebook | Reads from | What it produces |
-|---|---|---|
-| `Hyperparameter Tuning.ipynb` | Exp_9000–9251 | Per-HP reward curves + recommended HP values + apply-to-all-configs cell |
-| `Sensitivity Analysis.ipynb` | Exp_7000–7179 | Figures A/B/C + DM-ranking table + reward-weight recommendation (Part 3) |
-| `Bulletproofing.ipynb` | Exp_8000–8026 | Diagonal-dominance test + Part 1 free analyses from 7xxx data |
-| `Experiment 1 Figures.ipynb` | Exp_4xxx, 5xxx, 6xxx | Main paper Figures 2/3 (convergence, training curves) |
-| `Experiment 2 Figures.ipynb` | Exp_4xxx, 5xxx, 6xxx | Table I (per-DM per-season metrics) |
-| `Experiment 3 Figures.ipynb` | Exp_4xxx, 5xxx, 6xxx | Sustainability indicator (Figure 5) |
-| `Discussion Figures.ipynb` | derived data | Discussion-section figures |
+The notebooks are built from scripts in [`../_scripts/`](../_scripts/) — edit the
+build script and re-run it rather than editing a notebook by hand.
 
-## Total experiment count (rerun ranges only)
+## Other directories
 
-| Range | Count | Status |
-|---|---|---|
-| 3xxx (data gen, planned) | 1 | TBD |
-| 4xxx (season 1) | 180 | pending HP analysis |
-| 5xxx (season 2) | 180 | pending HP analysis |
-| 6xxx (season 3) | 180 | pending HP analysis |
-| 7xxx (sensitivity) | 180 | pending HP analysis |
-| 8xxx (bulletproofing) | 27 | pending HP analysis |
-| 9000–9179 (HP tuning v1) | 180 | DQN+REINFORCE done, CMA+ODT pending |
-| 9180–9251 (HP tuning v2) | 72 | pending submission |
-| **Total** | **1000** | |
+| Directory | Contents |
+|---|---|
+| `Episode_Plateau_Eval/` | Exploratory notebooks over the 0xxx batch that set the episode and aggregation counts, plus early tuning comparisons. |
+| `Emissions_Eval/` | Early emissions-accounting notebook. |
+| `Archived/` | Superseded analysis notebook, kept for provenance. |
+| `odt_test/` | Standalone ODT smoke-test scripts. |
+| `initial_config.yaml` | Template for the run-mode settings a new experiment starts from. |
+| `experiment_list.txt` | Historical log of the 0xxx/1xxx/2xxx batches and the global changes applied across later ones. |
