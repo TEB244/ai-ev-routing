@@ -16,7 +16,7 @@ It deliberately separates two very different kinds of problem:
       a ranking that is stable across seeds but differs from the paper's claim.
       The runs are sound; the finding just changed.
 
-Paper reference (paper_figure_generators/PAPER_REVISION_HANDOFF.md). Reward is a
+Paper reference values (see the revision working notes). Reward is a
 negated cost, so it is NEGATIVE and HIGHER (less negative) = BETTER:
     DM ranking, best -> worst:  DQN (-79.4)  >  REINFORCE (-89)  >  CMA (-115.3)
     ODT's rank is intentionally NOT asserted (the action-space discretisation left
@@ -49,7 +49,7 @@ except ImportError:
 
 REPO = Path(__file__).resolve().parent
 
-# ---- paper's expected findings (PAPER_REVISION_HANDOFF.md) ----
+# ---- paper's expected findings ----
 EXPECTED_ORDER = ["DQN", "REINFORCE", "CMA"]                        # best -> worst (higher reward better)
 REF_REWARD = {"DQN": -79.39, "REINFORCE": -89.0, "CMA": -115.30}   # loose magnitude anchors
 DM_ORDER = ["CMA", "DQN", "ODT", "REINFORCE"]                      # alphabetical (paper figure convention)
