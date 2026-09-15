@@ -39,7 +39,7 @@ cells = []
 # -------------------------------------------------------------------- header
 cells.append(md(*split_lines("""# Sensitivity Analysis
 
-Reward-weight sensitivity sweep for the SURE-DM paper.
+Reward-weight sensitivity sweep for the VERDE paper.
 
 The reward function is parameterised as
 

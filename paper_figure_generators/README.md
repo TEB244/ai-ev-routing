@@ -1,7 +1,7 @@
 # Paper Figure Generators
 
 This folder contains the Jupyter notebooks that produce every figure and table
-used in the SURE-DM paper. The notebooks are set up to run **as-is on the
+used in the VERDE paper. The notebooks are set up to run **as-is on the
 Huron lab server**. If you run them anywhere else you will need to mirror
 Huron's data layout (see [Running off Huron](#running-off-huron) below).
 

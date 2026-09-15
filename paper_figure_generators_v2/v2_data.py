@@ -1,7 +1,7 @@
 """
 v2_data -- data layer for paper_figure_generators_v2.
 
-Regenerates the reward / in-simulation behaviour inputs of the SURE-DM paper
+Regenerates the reward / in-simulation behaviour inputs of the VERDE paper
 figures and tables from the **revised 4xxx experiments only** (3 seeds, all
 four seasons, all aggregation levels), reading the raw per-experiment metrics
 that the post-fix training runs wrote to ``/storage_1/metrics_postfix`` on

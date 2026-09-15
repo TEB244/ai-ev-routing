@@ -25,7 +25,7 @@ by `main.py -d` — on the cluster a scratch directory, on the lab server a path
 ## Numbering scheme
 
 There are 1,525 experiment directories. The leading digit identifies the batch, and
-the paper's results come from the **4xxx and above** ranges — roughly 950 runs. The
+the paper's results come from the **4xxx and above** ranges — about 1,100 runs. The
 rest is exploratory work kept for provenance.
 
 | Range | Count | Purpose |

@@ -3,7 +3,7 @@
 analyze_paper_alignment.py
 
 Rough pre-6xxx check: does the finished 4xxx + 5xxx data look CORRECT, and does it
-AGREE with the SURE-DM paper's expected findings -- so you can commit to the 6xxx
+AGREE with the VERDE paper's expected findings -- so you can commit to the 6xxx
 batch without discovering afterwards that something needs a rerun?
 
 It deliberately separates two very different kinds of problem:

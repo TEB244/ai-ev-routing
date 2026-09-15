@@ -1,8 +1,16 @@
-# Paper Figure Generators — v2 (revised 4xxx preview)
+# Paper Figure Generators — v2
 
-A copy of `paper_figure_generators/` rewired to regenerate a subset of the SURE-DM
-paper figures/tables from the **revised 4xxx experiments only**, so you can see how
-the trends move while the 5xxx and 6xxx reruns (the other 6 seeds) finish.
+> **Not the entry point.** To regenerate the paper's figures and tables, use
+> `../paper_figure_generators/Generate All Paper Figures.ipynb`. This directory
+> supplies the data-access layer that notebook reads through — `v2_data.py` and
+> `build_v2_cache.py` — which aggregates the post-fix raw metrics that the original
+> notebooks' pre-aggregated CSVs do not cover. The notebooks kept here are the
+> earlier per-figure copies, retained for provenance.
+
+This started as a copy of `paper_figure_generators/` rewired to regenerate a subset
+of the VERDE paper figures/tables from the **revised 4xxx experiments only**, so the
+trends could be checked while the 5xxx and 6xxx reruns (the other 6 seeds) were
+still finishing. The description below reflects that original 4xxx-only scope.
 
 ## What changed vs the original
 
