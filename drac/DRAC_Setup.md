@@ -25,7 +25,7 @@ cd projects/def-mcapretz/<your_username>
 
 Clone the repository using the following command:
 ```
-git clone https://github.com/LucasHartmanWestern/rl-for-vrp-csp.git
+git clone https://github.com/TEB244/ai-ev-routing.git
 ```
 
 
@@ -68,7 +68,7 @@ pip install --no-index --upgrade pip
 ### 5. Install the dependencies
 Go to the github repository:
 ```
-cd ~/projects/def-mcapretz/<your_username>/rl-for-vrp-csp
+cd ~/projects/def-mcapretz/<your_username>/ai-ev-routing
 ```
 
 Install pytorch separately:
