@@ -117,5 +117,9 @@ update_all_config.py
 *.stackdump
 .DS_Store
 Thumbs.db
-/.claude
-CLAUDE.md
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Internal working notes — kept on disk, never published.
+# ─────────────────────────────────────────────────────────────────────────────
+PAPER_REVISION_HANDOFF.md
+HP_TUNING_FINDINGS.md
